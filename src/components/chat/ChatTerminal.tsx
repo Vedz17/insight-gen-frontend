@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Paperclip, Send, BrainCircuit, User, X } from "lucide-react";
+import { Paperclip, Send, BrainCircuit, User, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ReactMarkdown from 'react-markdown'; 
@@ -33,6 +33,7 @@ export function ChatTerminal() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [agentStatus, setAgentStatus] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -149,6 +150,9 @@ export function ChatTerminal() {
             workspaceId: currentWorkspaceId, 
             newName: smartTitle 
           })
+        }).then(() => {
+          // 📢 SIDEBAR KO SIGNAL BHEJO KI REFRESH KARE!
+          window.dispatchEvent(new Event("workspaceUpdated"));
         }).catch(err => console.error("Rename failed", err));
       }
 
@@ -190,11 +194,33 @@ export function ChatTerminal() {
             const decoder = new TextDecoder();
             let aiText = "";
 
+            // 🚀 NINJA LOADER ON
+            setAgentStatus("🧠 AI is thinking...");
+
             while (true) {
               const { done, value } = await reader.read();
-              if (done) break;
+              if (done) {
+                setAgentStatus(null); // Stream over, loader off
+                break;
+              }
+              
               aiText += decoder.decode(value, { stream: true });
-              setMessages((prev) => prev.map((msg) => (msg.id === aiMessageId ? { ...msg, content: aiText } : msg)));
+
+              // Catch status tags
+              const statusRegex = /\[\[STATUS:(.*?)\]\]/g;
+              let match;
+              let lastStatus = null;
+              
+              while ((match = statusRegex.exec(aiText)) !== null) {
+                lastStatus = match[1];
+              }
+              if (lastStatus) {
+                setAgentStatus(lastStatus);
+              }
+
+              // Remove tags from screen
+              const cleanText = aiText.replace(/\[\[STATUS:(.*?)\]\]/g, "");
+              setMessages((prev) => prev.map((msg) => (msg.id === aiMessageId ? { ...msg, content: cleanText } : msg)));
             }
           }
         } else {
@@ -218,15 +244,38 @@ export function ChatTerminal() {
         const decoder = new TextDecoder();
         let aiText = "";
 
+        // 🚀 NINJA LOADER ON
+        setAgentStatus("🧠 AI is thinking...");
+
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done) {
+            setAgentStatus(null); // Stream over, loader off
+            break;
+          }
+          
           aiText += decoder.decode(value, { stream: true });
-          setMessages((prev) => prev.map((msg) => (msg.id === aiMessageId ? { ...msg, content: aiText } : msg)));
+
+          // Catch status tags
+          const statusRegex = /\[\[STATUS:(.*?)\]\]/g;
+          let match;
+          let lastStatus = null;
+          
+          while ((match = statusRegex.exec(aiText)) !== null) {
+            lastStatus = match[1];
+          }
+          if (lastStatus) {
+            setAgentStatus(lastStatus);
+          }
+
+          // Remove tags from screen
+          const cleanText = aiText.replace(/\[\[STATUS:(.*?)\]\]/g, "");
+          setMessages((prev) => prev.map((msg) => (msg.id === aiMessageId ? { ...msg, content: cleanText } : msg)));
         }
       }
     } catch (error) {
       console.error("API Call Error:", error);
+      setAgentStatus(null); // Agar error aaye toh loader band kar do
     }
   };
 
@@ -273,8 +322,19 @@ export function ChatTerminal() {
         </div>
       </div>
 
-      <div className="p-6 shrink-0 bg-white border-t border-slate-200">
+      <div className="p-6 shrink-0 bg-white border-t border-slate-200 relative">
         <div className="max-w-4xl mx-auto">
+          
+          {/* 🚀 LIVE AGENT STATUS LOADER (Ninja UI) */}
+          {agentStatus && (
+            <div className="flex justify-center mb-4 transition-all duration-300">
+              <div className="bg-blue-50 border border-blue-100 text-blue-700 text-xs px-4 py-2 rounded-full flex items-center gap-2 shadow-sm animate-pulse">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span className="font-medium tracking-wide">{agentStatus}</span>
+              </div>
+            </div>
+          )}
+
           {selectedFile && (
             <div className="mb-3 flex items-center gap-2 bg-blue-50 text-blue-700 w-fit px-3 py-1.5 rounded-lg text-sm border border-blue-200">
               <span className="truncate max-w-[200px]">{selectedFile.name}</span>
