@@ -8,28 +8,39 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { workspaceId, content, role } = body;
 
-    // 1. User ka sawal Database mein save karo
+    // 1. Naya message DB mein save karo
     await Message.create({ workspaceId, role, content });
 
-    // 2. Python backend ko sawal bhejo
+    // 🧠 2. MEMORY LOGIC: Puraani chat history uthao (Last 6 messages context ke liye)
+    const historyDocs = await Message.find({ workspaceId })
+                                   .sort({ createdAt: -1 })
+                                   .limit(6);
+    
+    // Purane messages chronological order mein lagao (Puraana pehle, naya baad mein)
+    historyDocs.reverse(); 
+
+    const chatHistory = historyDocs.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
+
+    // 3. Python backend ko sawal + History dono bhejo
     const pythonRes = await fetch("http://127.0.0.1:8000/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         question: content,
-        domain: "General" 
+        domain: "General",
+        chat_history: chatHistory, 
+        workspace_id: workspaceId// 🧠 Ye rha tera Memory bridge!
       })
     });
 
-    if (!pythonRes.body) {
-      throw new Error("No response body from Python");
-    }
+    if (!pythonRes.body) throw new Error("No response body from Python");
 
     // ==========================================
-    // 🚀 THE STREAMING BRIDGE (MAGIC)
+    // 🚀 THE STREAMING BRIDGE
     // ==========================================
-    // Ye stream Python se data lega, frontend ko fekega aur DB mein bhi save karega!
-    
     const stream = new ReadableStream({
       async start(controller) {
         const reader = pythonRes.body?.getReader();
@@ -38,36 +49,26 @@ export async function POST(req: Request) {
         let aiFullAnswer = "";
         const decoder = new TextDecoder();
 
-        // 1. Jab tak Python data fek raha hai, use padho
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          // 2. Raw data ko Text mein badlo aur aage fek do (Frontend ke liye)
           const chunkText = decoder.decode(value, { stream: true });
-          aiFullAnswer += chunkText; // DB ke liye text jama karo
+          aiFullAnswer += chunkText; 
           controller.enqueue(value);
         }
 
-        // 3. Stream khatam hone ke baad, AI ka poora answer Database mein save kar do
         try {
-          await Message.create({
-            workspaceId,
-            role: "ai",
-            content: aiFullAnswer
-          });
+          // AI ka final answer DB mein save karo
+          await Message.create({ workspaceId, role: "ai", content: aiFullAnswer });
         } catch (dbError) {
-          console.error("Failed to save AI message to DB:", dbError);
+          console.error("Failed to save AI message:", dbError);
         }
-
         controller.close();
       }
     });
 
-    // 4. Stream ko Frontend ki taraf bhej do
-    return new Response(stream, {
-      headers: { "Content-Type": "text/plain" }
-    });
+    return new Response(stream, { headers: { "Content-Type": "text/plain" } });
 
   } catch (error) {
     console.error("Chat API Error:", error);

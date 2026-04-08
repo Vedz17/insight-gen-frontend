@@ -1,21 +1,25 @@
- import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
-    // 1. Frontend se FormData aayega, jisme file chupi hogi
     const formData = await req.formData();
     const file = formData.get("file");
+    const workspaceId = formData.get("workspaceId"); 
 
-    if (!file) {
-      return NextResponse.json({ success: false, error: "File nahi mili!" });
+    if (!file || !workspaceId) {
+      return NextResponse.json({ success: false, error: "File or Workspace ID missing from frontend!" });
     }
 
-    console.log("🚀 Forwarding PDF to Python Backend...");
+    console.log(`🚀 Forwarding PDF for Workspace: ${workspaceId} to Python Backend...`);
 
-    // 2. Python (FastAPI) ko file pass kar do
+    // 🚀 THE FIX: Python ko bhejne ke liye naya (fresh) FormData banao
+    const pythonFormData = new FormData();
+    pythonFormData.append("file", file);
+    pythonFormData.append("workspaceId", workspaceId);
+
     const pythonRes = await fetch("http://127.0.0.1:8000/upload-pdf/", {
       method: "POST",
-      body: formData, // Notice: No "Content-Type" header here, Fetch handles boundaries automatically
+      body: pythonFormData, 
     });
 
     const data = await pythonRes.json();
@@ -23,7 +27,8 @@ export async function POST(req: Request) {
     if (pythonRes.ok) {
       return NextResponse.json({ success: true, data });
     } else {
-      return NextResponse.json({ success: false, error: data.detail });
+      // 🚀 THE FIX: Agar 422 error aaye toh usko String mein convert karo taaki padh sakein
+      return NextResponse.json({ success: false, error: JSON.stringify(data.detail) });
     }
 
   } catch (error: any) {

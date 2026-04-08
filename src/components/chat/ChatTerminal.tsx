@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Paperclip, Send, BrainCircuit, User, X, Loader2 } from "lucide-react";
+// 🚀 NAYA: Download icon import kiya hai
+import { Paperclip, Send, BrainCircuit, User, X, Loader2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ReactMarkdown from 'react-markdown'; 
@@ -12,19 +13,12 @@ type Message = {
   content: string;
 };
 
-// 🧠 SMART TITLE GENERATOR (Faltu words ignore karega)
+// 🧠 SMART TITLE GENERATOR
 const generateSmartTitle = (text: string) => {
   const stopWords = ['what', 'is', 'are', 'the', 'of', 'in', 'how', 'to', 'can', 'you', 'tell', 'me', 'about', 'a', 'an', 'give', 'some', 'details', 'explain', 'please', 'do', 'does', 'did', 'for', 'with', 'on', 'my', 'i', 'want', 'know'];
-  
-  // Special characters hatao aur words ko alag karo
   const words = text.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/);
-  
-  // Stop-words hatao aur sirf meaningful words rakho (jinki length > 2 ho)
   const meaningfulWords = words.filter(w => !stopWords.includes(w) && w.length > 2);
-
   if (meaningfulWords.length === 0) return "New Conversation";
-
-  // Shuru ke 3 words lo aur unka Pehla Letter Capital kar do (Title Case)
   return meaningfulWords.slice(0, 3).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }; 
 
@@ -37,30 +31,26 @@ export function ChatTerminal() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll function
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, agentStatus]); 
   
-  // 🚀 UPDATED HISTORY FETCH LOGIC
+  // 🚀 HISTORY FETCH LOGIC
   useEffect(() => {
     const fetchHistory = async () => {
-      // 1. URL se check karo ki koi chat khuli hai ya nahi
       const params = new URLSearchParams(window.location.search);
       const urlWorkspaceId = params.get("workspaceId");
 
-      // 2. Agar New Workspace hai (ID nahi hai), toh screen khali rakho
       if (!urlWorkspaceId) {
         setMessages([]);
         setWorkspaceId(null);
         return;
       }
 
-      // 3. Agar ID hai, toh API ko wahi ID bhejo
       try {
         const res = await fetch(`/api/chat/history?workspaceId=${urlWorkspaceId}`);
         const data = await res.json();
@@ -95,13 +85,49 @@ export function ChatTerminal() {
     }
   };
 
+  // 🚀 HACKATHON TRICK: Text to MS Word Downloader
+const downloadAsWord = (text: string) => {
+    let formattedText = text
+      // 1. AI ki faltu spaces: Double Enter ko Single Enter mein badlo
+      .replace(/\n\s*\n/g, '\n')
+      
+      // 2. Bold Text
+      .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+      
+      // 3. Headings (Inke aage-peeche ka space fix kiya)
+      .replace(/^### (.*$)/gim, '<h3 style="margin-top: 12px; margin-bottom: 4px;">$1</h3>')
+      .replace(/^## (.*$)/gim, '<h2 style="margin-top: 14px; margin-bottom: 4px;">$1</h2>')
+      .replace(/^# (.*$)/gim, '<h1 style="margin-top: 16px; margin-bottom: 4px;">$1</h1>')
+      
+      // 4. 🚀 THE FIX: <ul> hata diya! Ab simple paragraph use hoga jisme perfect margin hai
+      .replace(/^\s*[\*\-\+]\s+(.*)$/gim, '<p style="margin-top: 2px; margin-bottom: 2px; margin-left: 20px;">&bull; $1</p>')
+      
+      // 5. Bachi hui lines ko break karo
+      .replace(/\n/g, '<br>')
+      
+      // 6. Heading ya Bullet ke theek baad aane wale faltu <br> (empty space) ko hatao
+      .replace(/(<\/p>|<\/h[1-3]>)<br>/g, '$1');
+
+    const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Report</title></head><body>";
+    const footer = "</body></html>";
+    
+    // Line height 1.5 se 1.4 kardi taaki aur compact lage
+    const sourceHTML = header + "<div style='font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.4;'>" + formattedText + "</div>" + footer;
+    
+    const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
+    const fileDownload = document.createElement("a");
+    document.body.appendChild(fileDownload);
+    fileDownload.href = source;
+    fileDownload.download = 'NAAC_Generated_Report.doc';
+    fileDownload.click();
+    document.body.removeChild(fileDownload);
+  };
+  
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!inputValue.trim() && !selectedFile) return;
 
-    // 🚀 Check if this is the FIRST message
     const isFirstMessage = messages.length === 0;
-
     const userQuestion = inputValue.trim(); 
     const messageContent = userQuestion || `Uploaded file: ${selectedFile?.name}`;
 
@@ -119,7 +145,6 @@ export function ChatTerminal() {
     try {
       let currentWorkspaceId = workspaceId;
 
-      // Agar Workspace nahi hai, toh pehle naya banao
       if (!currentWorkspaceId) {
         const res = await fetch("/api/workspace", {
           method: "POST",
@@ -136,30 +161,19 @@ export function ChatTerminal() {
         }
       }
 
-      // ==========================================
-      // 🚀 SMART AUTO-RENAME MAGIC
-      // ==========================================
       if (isFirstMessage && userQuestion) {
         const smartTitle = generateSmartTitle(userQuestion);
-        
-        // Background mein naam update kar do (Fire and forget)
         fetch("/api/workspace", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            workspaceId: currentWorkspaceId, 
-            newName: smartTitle 
-          })
+          body: JSON.stringify({ workspaceId: currentWorkspaceId, newName: smartTitle })
         }).then(() => {
-          // 📢 SIDEBAR KO SIGNAL BHEJO KI REFRESH KARE!
           window.dispatchEvent(new Event("workspaceUpdated"));
         }).catch(err => console.error("Rename failed", err));
       }
 
-      // ==========================================
-      // SCENARIO 1: FILE UPLOAD + QUESTION
-      // ==========================================
       if (currentFile) {
+        // Upload Scenario
         const loadingId = "loading-" + Date.now();
         setMessages((prev) => [...prev, { 
           id: loadingId, role: "ai", content: "⏳ *Reading PDF and storing in Pinecone Database... please wait.*" 
@@ -167,6 +181,7 @@ export function ChatTerminal() {
 
         const formData = new FormData();
         formData.append("file", currentFile);
+        formData.append("workspaceId", currentWorkspaceId); // 🚀 Private Room ID
 
         const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
         const uploadData = await uploadRes.json();
@@ -181,101 +196,60 @@ export function ChatTerminal() {
           setMessages((prev) => [...prev, successMsg]);
 
           if (userQuestion) {
-            const chatRes = await fetch("/api/chat", {
-              method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ workspaceId: currentWorkspaceId, content: userQuestion, role: "user" })
-            });
-
-            if (!chatRes.body) return;
-            const aiMessageId = (Date.now() + 1).toString();
-            setMessages((prev) => [...prev, { id: aiMessageId, role: "ai", content: "" }]);
-
-            const reader = chatRes.body.getReader();
-            const decoder = new TextDecoder();
-            let aiText = "";
-
-            // 🚀 NINJA LOADER ON
-            setAgentStatus("🧠 AI is thinking...");
-
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) {
-                setAgentStatus(null); // Stream over, loader off
-                break;
-              }
-              
-              aiText += decoder.decode(value, { stream: true });
-
-              // Catch status tags
-              const statusRegex = /\[\[STATUS:(.*?)\]\]/g;
-              let match;
-              let lastStatus = null;
-              
-              while ((match = statusRegex.exec(aiText)) !== null) {
-                lastStatus = match[1];
-              }
-              if (lastStatus) {
-                setAgentStatus(lastStatus);
-              }
-
-              // Remove tags from screen
-              const cleanText = aiText.replace(/\[\[STATUS:(.*?)\]\]/g, "");
-              setMessages((prev) => prev.map((msg) => (msg.id === aiMessageId ? { ...msg, content: cleanText } : msg)));
-            }
+            startChatStream(currentWorkspaceId, userQuestion);
           }
         } else {
           setMessages((prev) => [...prev, { id: Date.now().toString(), role: "ai", content: `❌ **Upload Failed:** ${uploadData.error}` }]);
         }
-
       } else {
-        // ==========================================
-        // SCENARIO 2: NORMAL TEXT CHAT (Streaming)
-        // ==========================================
-        const chatRes = await fetch("/api/chat", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ workspaceId: currentWorkspaceId, content: messageContent, role: "user" })
-        });
-
-        if (!chatRes.body) return;
-        const aiMessageId = (Date.now() + 1).toString();
-        setMessages((prev) => [...prev, { id: aiMessageId, role: "ai", content: "" }]);
-
-        const reader = chatRes.body.getReader();
-        const decoder = new TextDecoder();
-        let aiText = "";
-
-        // 🚀 NINJA LOADER ON
-        setAgentStatus("🧠 AI is thinking...");
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            setAgentStatus(null); // Stream over, loader off
-            break;
-          }
-          
-          aiText += decoder.decode(value, { stream: true });
-
-          // Catch status tags
-          const statusRegex = /\[\[STATUS:(.*?)\]\]/g;
-          let match;
-          let lastStatus = null;
-          
-          while ((match = statusRegex.exec(aiText)) !== null) {
-            lastStatus = match[1];
-          }
-          if (lastStatus) {
-            setAgentStatus(lastStatus);
-          }
-
-          // Remove tags from screen
-          const cleanText = aiText.replace(/\[\[STATUS:(.*?)\]\]/g, "");
-          setMessages((prev) => prev.map((msg) => (msg.id === aiMessageId ? { ...msg, content: cleanText } : msg)));
-        }
+        // Normal Chat Scenario
+        startChatStream(currentWorkspaceId, messageContent);
       }
     } catch (error) {
       console.error("API Call Error:", error);
-      setAgentStatus(null); // Agar error aaye toh loader band kar do
+      setAgentStatus(null);
+    }
+  };
+
+  const startChatStream = async (workspaceId: string, content: string) => {
+    const chatRes = await fetch("/api/chat", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspaceId, content, role: "user" })
+    });
+
+    if (!chatRes.body) return;
+    const aiMessageId = (Date.now() + 1).toString();
+    
+    setMessages((prev) => [...prev, { id: aiMessageId, role: "ai", content: "" }]);
+
+    const reader = chatRes.body.getReader();
+    const decoder = new TextDecoder();
+    let aiText = "";
+
+    setAgentStatus("Thinking...");
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        setAgentStatus(null);
+        break;
+      }
+      
+      aiText += decoder.decode(value, { stream: true });
+
+      const statusRegex = /\[\[STATUS:(.*?)\]\]/g;
+      let match;
+      let lastStatus = null;
+      
+      while ((match = statusRegex.exec(aiText)) !== null) {
+        lastStatus = match[1];
+      }
+      if (lastStatus) setAgentStatus(lastStatus);
+
+      const cleanText = aiText.replace(/\[\[STATUS:(.*?)\]\]/g, "");
+      if (cleanText.trim().length > 0) setAgentStatus(null); 
+      
+      setMessages((prev) => prev.map((msg) => (msg.id === aiMessageId ? { ...msg, content: cleanText } : msg)));
     }
   };
 
@@ -303,15 +277,39 @@ export function ChatTerminal() {
                 {msg.role === "user" ? <User size={18} /> : <BrainCircuit size={18} />}
               </div>
               
-              <div className={`border rounded-2xl p-4 text-sm leading-relaxed max-w-[85%] ${
+              <div className={`border rounded-2xl p-4 text-sm leading-relaxed max-w-[85%] min-h-[3rem] ${
                 msg.role === "user" 
                   ? "bg-slate-800 text-white rounded-tr-none border-slate-800" 
                   : "bg-slate-50 text-slate-800 rounded-tl-none border-slate-200"
               }`}>
                 {msg.role === "ai" ? (
-                  <div className="prose prose-sm prose-slate max-w-none prose-headings:text-slate-900 prose-strong:text-slate-900 prose-p:leading-relaxed">
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
-                  </div>
+                  !msg.content && agentStatus ? (
+                    <div className="flex items-center gap-3 text-blue-600 animate-pulse py-1">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="font-semibold tracking-wide">{agentStatus}</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      <div className="prose prose-sm prose-slate max-w-none prose-headings:text-slate-900 prose-strong:text-slate-900 prose-p:leading-relaxed">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+                      
+                      {/* 🚀 NAYA: DOWNLOAD BUTTON WALA JADU */}
+                      {msg.content.length > 150 && (
+                        <div className="pt-3 border-t border-slate-200 mt-2">
+                          <Button 
+                            onClick={() => downloadAsWord(msg.content)}
+                            variant="outline" 
+                            size="sm" 
+                            className="flex items-center gap-2 text-blue-600 border-blue-200 hover:bg-blue-50 w-fit"
+                          >
+                            <Download size={14} />
+                            Download as Word
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )
                 ) : (
                   <div className="whitespace-pre-wrap">{msg.content}</div>
                 )}
@@ -324,17 +322,6 @@ export function ChatTerminal() {
 
       <div className="p-6 shrink-0 bg-white border-t border-slate-200 relative">
         <div className="max-w-4xl mx-auto">
-          
-          {/* 🚀 LIVE AGENT STATUS LOADER (Ninja UI) */}
-          {agentStatus && (
-            <div className="flex justify-center mb-4 transition-all duration-300">
-              <div className="bg-blue-50 border border-blue-100 text-blue-700 text-xs px-4 py-2 rounded-full flex items-center gap-2 shadow-sm animate-pulse">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span className="font-medium tracking-wide">{agentStatus}</span>
-              </div>
-            </div>
-          )}
-
           {selectedFile && (
             <div className="mb-3 flex items-center gap-2 bg-blue-50 text-blue-700 w-fit px-3 py-1.5 rounded-lg text-sm border border-blue-200">
               <span className="truncate max-w-[200px]">{selectedFile.name}</span>
