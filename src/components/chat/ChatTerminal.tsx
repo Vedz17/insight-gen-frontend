@@ -86,7 +86,7 @@ export function ChatTerminal() {
   };
 
   // 🚀 HACKATHON TRICK: Text to MS Word Downloader
-const downloadAsWord = (text: string) => {
+  const downloadAsWord = (text: string) => {
     let formattedText = text
       // 1. AI ki faltu spaces: Double Enter ko Single Enter mein badlo
       .replace(/\n\s*\n/g, '\n')
@@ -181,7 +181,16 @@ const downloadAsWord = (text: string) => {
 
         const formData = new FormData();
         formData.append("file", currentFile);
-        formData.append("workspaceId", currentWorkspaceId); // 🚀 Private Room ID
+        
+        // 🚀 THE GUARD CLAUSE FIX (Strict TypeScript check)
+        if (!currentWorkspaceId) {
+          console.error("No Workspace ID found!");
+          setMessages((prev) => prev.filter(msg => msg.id !== loadingId)); // Remove loader
+          setMessages((prev) => [...prev, { id: Date.now().toString(), role: "ai", content: "❌ **Error:** Workspace ID could not be generated. Please try again." }]);
+          return; 
+        }
+
+        formData.append("workspaceId", currentWorkspaceId); // TypeScript is happy now!
 
         const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
         const uploadData = await uploadRes.json();
@@ -203,7 +212,7 @@ const downloadAsWord = (text: string) => {
         }
       } else {
         // Normal Chat Scenario
-        startChatStream(currentWorkspaceId, messageContent);
+        startChatStream(currentWorkspaceId as string, messageContent);
       }
     } catch (error) {
       console.error("API Call Error:", error);
