@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db/connect";
 import { Message } from "@/lib/db/models";
 
+export const dynamic = "force-dynamic"; //to enable streaming 
+
 export async function POST(req: Request) {
   try {
     await connectToDB();
@@ -61,14 +63,19 @@ export async function POST(req: Request) {
         }
 
         try {
-          // 🧹 THE CLEANUP FIX: Regex se saare STATUS tags hatao DB mein daalne se pehle
+          // 🧹 THE CLEANUP FIX
           const cleanFinalAnswer = aiFullAnswer.replace(/\[\[STATUS:.*?\]\]/g, "").trim();
           
-          // AI ka saaf final answer DB mein save 
-          await Message.create({ workspaceId, role: "ai", content: cleanFinalAnswer });
+          // 🛡️ THE SAFETY LOCK: Agar clean hone ke baad answer bacha hai, tabhi save karo
+          if (cleanFinalAnswer.length > 0) {
+            await Message.create({ workspaceId, role: "ai", content: cleanFinalAnswer });
+          } else {
+            console.log("Skipped DB save: AI sent an empty response or crashed.");
+          }
         } catch (dbError) {
           console.error("Failed to save AI message:", dbError);
         }
+         
         controller.close();
       }
     });
