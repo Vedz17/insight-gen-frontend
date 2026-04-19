@@ -80,7 +80,15 @@ export async function POST(req: Request) {
       }
     });
 
-    return new Response(stream, { headers: { "Content-Type": "text/plain" } });
+   // 🚀 VERCEL STREAMING UNLOCKER: Vercel ko batao ki stream beech mein na roke
+return new Response(stream, { 
+    headers: { 
+        "Content-Type": "text/plain",
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive",
+        "Transfer-Encoding": "chunked"
+    } 
+});
 
   } catch (error) {
     console.error("Chat API Error:", error);

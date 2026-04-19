@@ -17,7 +17,10 @@ export async function POST(req: Request) {
     pythonFormData.append("file", file);
     pythonFormData.append("workspaceId", workspaceId);
 
-    const pythonRes = await fetch("http://127.0.0.1:8000/upload-pdf/", {
+    // 🚀 THE FIX: Localhost hata kar Render ka URL dynamic banao
+    const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "https://multi-agent-insight-genarator.onrender.com";
+
+    const pythonRes = await fetch(`${BACKEND_URL}/upload-pdf/`, {
       method: "POST",
       body: pythonFormData, 
     });
