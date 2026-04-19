@@ -61,8 +61,11 @@ export async function POST(req: Request) {
         }
 
         try {
-          // AI ka final answer DB mein save 
-          await Message.create({ workspaceId, role: "ai", content: aiFullAnswer });
+          // 🧹 THE CLEANUP FIX: Regex se saare STATUS tags hatao DB mein daalne se pehle
+          const cleanFinalAnswer = aiFullAnswer.replace(/\[\[STATUS:.*?\]\]/g, "").trim();
+          
+          // AI ka saaf final answer DB mein save 
+          await Message.create({ workspaceId, role: "ai", content: cleanFinalAnswer });
         } catch (dbError) {
           console.error("Failed to save AI message:", dbError);
         }
