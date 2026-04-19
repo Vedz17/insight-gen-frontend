@@ -24,8 +24,10 @@ export async function POST(req: Request) {
       content: msg.content
     }));
 
-    // 3. Python backend ko sawal + History dono bhejo
-    const pythonRes = await fetch("http://127.0.0.1:8000/chat", {
+    const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "https://multi-agent-insight-genarator.onrender.com";
+
+// 2. Ab fetch function mein us variable ko use kar:
+    const pythonRes = await fetch(`${BACKEND_URL}/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -59,7 +61,7 @@ export async function POST(req: Request) {
         }
 
         try {
-          // AI ka final answer DB mein save karo
+          // AI ka final answer DB mein save 
           await Message.create({ workspaceId, role: "ai", content: aiFullAnswer });
         } catch (dbError) {
           console.error("Failed to save AI message:", dbError);
