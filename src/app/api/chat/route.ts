@@ -40,6 +40,12 @@ export async function POST(req: Request) {
       })
     });
 
+    if (!pythonRes.ok) {
+      const errorText = await pythonRes.text();
+      console.error("🚨 PYTHON BACKEND NE ERROR DIYA:", pythonRes.status, errorText);
+      return NextResponse.json({ success: false, error: `Backend Error: ${pythonRes.status}` });
+    }
+
     if (!pythonRes.body) throw new Error("No response body from Python");
 
     // ==========================================
