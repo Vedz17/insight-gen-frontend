@@ -169,3 +169,20 @@
 .dark-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #475569; 
 }
+
+.sidebar-no-focus, 
+.sidebar-no-focus *, 
+.sidebar-no-focus *:focus, 
+.sidebar-no-focus *:focus-visible, 
+.sidebar-no-focus *:active {
+    outline: none !important;
+    outline-color: transparent !important;
+    box-shadow: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    -webkit-focus-ring-color: transparent !important;
+}
+
+/* Specific fix for Next.js Links inside Sidebar */
+.sidebar-no-focus a:focus {
+    outline: none !important;
+}
