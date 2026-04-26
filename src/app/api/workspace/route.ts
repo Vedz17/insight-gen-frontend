@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db/connect";
-import { Workspace , Message } from "@/lib/db/models";
+import { Workspace , Message ,ActivityLog } from "@/lib/db/models";
 
 export async function GET() {
   try {
@@ -13,30 +13,42 @@ export async function GET() {
   }
 }
 
-// POST Request: Naya workspace banane ke liye
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { pdfName } = body;
+    // Senior dev tip: Fallback name hamesha rakho
+    const { name } = body; 
 
     await connectToDB();
 
+    // 1. Create the Workspace (The Container)
     const newWorkspace = await Workspace.create({
-      userId: "guest_user", // Abhi ke liye default user
-      pdfName: pdfName || "Untitled Chat",
-      messages: [] 
+      name: name || "New Project Workspace",
+      userId: "guest_user", // Future mein auth.userId se replace karenge
+    });
+
+    // 2. Dashboard ke liye activity log banao (Optional but good)
+    await ActivityLog.create({
+      workspaceId: newWorkspace._id,
+      type: 'chat', // Initial setup activity
+      title: `Created workspace: ${newWorkspace.name}`
     });
 
     return NextResponse.json({ 
       success: true, 
-      workspaceId: newWorkspace._id 
+      workspaceId: newWorkspace._id,
+      name: newWorkspace.name
     }, { status: 201 });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Workspace creation failed:", error);
-    return NextResponse.json({ error: "Failed to create workspace" }, { status: 500 });
+    return NextResponse.json({ 
+      success: false, 
+      error: "Failed to create workspace" 
+    }, { status: 500 });
   }
 }
+
 
 // 🚀 THE FIX: Frontend ko crash hone se bachane ke liye PUT method
 export async function PUT(req: Request) {

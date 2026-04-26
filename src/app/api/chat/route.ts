@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db/connect";
-import { Message } from "@/lib/db/models";
+import { Message, ActivityLog } from "@/lib/db/models";
 
-export const dynamic = "force-dynamic"; //to enable streaming 
+export const dynamic = "force-dynamic";
+
+// Python FastAPI ka URL (ensure your FastAPI is running here)
+const BACKEND_URL = process.env.BACKEND_URL || "http://127.0.0.1:8000";
 
 export async function POST(req: Request) {
   try {
@@ -10,15 +13,15 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { workspaceId, content, role } = body;
 
-    // 1. Naya message DB mein save karo
-    await Message.create({ workspaceId, role, content });
+    if (!workspaceId || !content) {
+      return NextResponse.json({ success: false, error: "Missing workspaceId or content" }, { status: 400 });
+    }
 
-    // 🧠 2. MEMORY LOGIC: Puraani chat history uthao (Last 6 messages context ke liye)
+    // 🧠 1. FETCH CONTEXT HISTORY (Latest 4 messages)
     const historyDocs = await Message.find({ workspaceId })
-                                   .sort({ createdAt: -1 })
-                                   .limit(6);
+      .sort({ createdAt: -1 })
+      .limit(4);
     
-    // Purane messages chronological order mein lagao (Puraana pehle, naya baad mein)
     historyDocs.reverse(); 
 
     const chatHistory = historyDocs.map(msg => ({
@@ -26,31 +29,36 @@ export async function POST(req: Request) {
       content: msg.content
     }));
 
-    const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "https://multi-agent-insight-genarator.onrender.com";
+    // 💾 2. SAVE USER MESSAGE TO DB
+    await Message.create({ workspaceId, role, content });
 
-// 2. Ab fetch function mein us variable ko use kar:
+    // 📊 3. LOG ACTIVITY FOR DASHBOARD
+    await ActivityLog.create({
+      workspaceId,
+      type: 'chat',
+      title: `Query: "${content.substring(0, 40)}..."`,
+      createdAt: new Date()
+    });
+
+    // 📡 4. CALL PYTHON ENGINE (LangGraph)
+    console.log(`📡 Streaming from Python for Workspace: ${workspaceId}`);
+    
     const pythonRes = await fetch(`${BACKEND_URL}/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         question: content,
-        domain: "General",
-        chat_history: chatHistory, 
-        workspace_id: workspaceId// 🧠 Ye rha tera Memory bridge!
+        domain: "NAAC Analyst",
+        chat_history: chatHistory,
+        workspace_id: workspaceId // Python expects snake_case
       })
     });
 
     if (!pythonRes.ok) {
-      const errorText = await pythonRes.text();
-      console.error("🚨 PYTHON BACKEND NE ERROR DIYA:", pythonRes.status, errorText);
-      return NextResponse.json({ success: false, error: `Backend Error: ${pythonRes.status}` });
+      return NextResponse.json({ success: false, error: "AI Engine is offline" }, { status: 502 });
     }
 
-    if (!pythonRes.body) throw new Error("No response body from Python");
-
-    // ==========================================
-    // 🚀 THE STREAMING BRIDGE
-    // ==========================================
+    // 🚀 5. THE STREAMING BRIDGE
     const stream = new ReadableStream({
       async start(controller) {
         const reader = pythonRes.body?.getReader();
@@ -59,45 +67,48 @@ export async function POST(req: Request) {
         let aiFullAnswer = "";
         const decoder = new TextDecoder();
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunkText = decoder.decode(value, { stream: true });
-          aiFullAnswer += chunkText; 
-          controller.enqueue(value);
-        }
-
         try {
-          // 🧹 THE CLEANUP FIX
-          const cleanFinalAnswer = aiFullAnswer.replace(/\[\[STATUS:.*?\]\]/g, "").trim();
-          
-          // 🛡️ THE SAFETY LOCK: Agar clean hone ke baad answer bacha hai, tabhi save karo
-          if (cleanFinalAnswer.length > 0) {
-            await Message.create({ workspaceId, role: "ai", content: cleanFinalAnswer });
-          } else {
-            console.log("Skipped DB save: AI sent an empty response or crashed.");
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunkText = decoder.decode(value, { stream: true });
+            
+            // We enqueue the raw value so frontend gets the [[STATUS:...]] tags
+            controller.enqueue(value);
+            
+            // Build the full answer but ignore status tags for DB storage
+            if (!chunkText.includes("[[STATUS:")) {
+              aiFullAnswer += chunkText;
+            }
           }
-        } catch (dbError) {
-          console.error("Failed to save AI message:", dbError);
+
+          // 💾 SAVE CLEAN AI RESPONSE TO DB AFTER STREAM ENDS
+          if (aiFullAnswer.trim().length > 0) {
+            await Message.create({ 
+              workspaceId, 
+              role: "ai", 
+              content: aiFullAnswer.trim() 
+            });
+          }
+        } catch (err) {
+          console.error("Stream Error:", err);
+        } finally {
+          controller.close();
         }
-         
-        controller.close();
       }
     });
 
-   // 🚀 VERCEL STREAMING UNLOCKER: Vercel ko batao ki stream beech mein na roke
-return new Response(stream, { 
-    headers: { 
-        "Content-Type": "text/plain",
-        "Cache-Control": "no-cache, no-transform",
+    return new Response(stream, { 
+      headers: { 
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-cache",
         "Connection": "keep-alive",
-        "Transfer-Encoding": "chunked"
-    } 
-});
+      } 
+    });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Chat API Error:", error);
-    return NextResponse.json({ success: false, error: "Something went wrong" });
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
