@@ -80,7 +80,7 @@ export default function WorkspacePage() {
 
               <h3 className="text-xl font-bold text-[#E5E7EB] mb-2 truncate group-hover:text-white">
                 {/* 🚀 BUG FIXED HERE: Fetches 'name' first to match sidebar */}
-                {ws.name || ws.title || ws.pdfName || "Untitled Workspace"}
+                {ws.name  || "Untitled Workspace"}
               </h3>
               
               <div className="flex items-center gap-2 text-sm text-[#9CA3AF] mb-6">
