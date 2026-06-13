@@ -11,7 +11,7 @@ const isProtectedRoute = createRouteMatcher([
 export default clerkMiddleware(async (auth, req) => {
   // Agar route protected hai, toh user ko login karne bol do
   if (isProtectedRoute(req)) {
-    await auth().protect(); // 
+    await auth.protect(); // 
   }
 });
 
