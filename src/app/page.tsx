@@ -65,12 +65,13 @@ function Navbar() {
                   className="text-sm font-medium text-slate-400 hover:text-white transition-colors">How it works</button>
           
           {!userId ? (
-            <SignInButton mode="modal">
-              <button className="group relative px-6 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl overflow-hidden transition-all active:scale-95 shadow-[0_0_20px_rgba(37,99,235,0.3)]">
-                 <span className="relative z-10">Log In / Sign Up</span>
-                 <div className="absolute top-0 -inset-full h-full w-1/2 z-5 block transform -skew-x-12 bg-gradient-to-r from-transparent via-white/20 to-transparent group-hover:animate-streak" />
-              </button>
-            </SignInButton>
+            <Link 
+  href="/dashboard"
+  className="group relative inline-block px-6 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl overflow-hidden transition-all active:scale-95 shadow-[0_0_20px_rgba(37,99,235,0.3)] z-50 pointer-events-auto cursor-pointer"
+>
+  <span className="relative z-10">Log In / Sign Up</span>
+  <div className="absolute top-0 -inset-full h-full w-1/2 z-0 block transform -skew-x-12 bg-gradient-to-r from-transparent via-white/20 to-transparent group-hover:animate-streak" />
+</Link>
           ) : (
             <>
               <Link href="/dashboard" className="text-sm font-bold text-white hover:text-blue-400 transition-colors">
