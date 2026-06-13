@@ -1,21 +1,27 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
-// 🚀 Yahan hum define kar rahe hain ki kaunse routes lock karne hain
 const isProtectedRoute = createRouteMatcher([
-  '/dashboard(.*)', 
-  '/documents(.*)', 
+  '/dashboard(.*)',
+  '/documents(.*)',
   '/chat(.*)',
   '/workspace(.*)'
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
-  // Agar route protected hai, toh user ko login karne bol do
   if (isProtectedRoute(req)) {
-    await auth.protect(); // 
+    // 🚀 FIX: Bypass the buggy protect() method. Manually check user ID!
+    const { userId, redirectToSignIn } = await auth();
+    
+    if (!userId) {
+      return redirectToSignIn();
+    }
   }
 });
 
-// Ye config ensure karta hai ki API aur static files block na hon
 export const config = {
-  matcher: ["/((?!.*\\..*|_next).*)", "/", "/(api|trpc)(.*)"],
+  matcher: [
+    "/((?!.*\\..*|_next).*)", 
+    "/", 
+    "/(api|trpc)(.*)"
+  ],
 };
