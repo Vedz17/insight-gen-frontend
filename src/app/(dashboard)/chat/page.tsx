@@ -95,7 +95,7 @@ export default function ChatArena() {
                   className="bg-[#0B0F19] border border-[#1F2937] text-blue-400 text-xs font-bold py-1.5 pl-4 pr-10 rounded-full appearance-none outline-none cursor-pointer"
                 >
                   <option value="" disabled>Select Workspace</option>
-                  {workspaces.map(ws => <option key={ws._id} value={ws._id}>{ws.name || ws.title}</option>)}
+                  {workspaces.map(ws => <option key={ws._id} value={ws._id}>{ws.name }</option>)}
                 </select>
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
               </div>
