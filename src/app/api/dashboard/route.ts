@@ -1,27 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db/connect";
-import { Document, Workspace, Message, ActivityLog, Report } from "@/lib/db/models"; // Report model added
+import { Document, Workspace, Message, ActivityLog, Report } from "@/lib/db/models"; 
+// 🚀 FIX: Clerk auth import kiya
+import { auth } from '@clerk/nextjs/server';
 
-export const dynamic = 'force-dynamic'; // IMPORTANT: Prevents Next.js from caching old data
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
+    // 🚀 FIX: Security check - sir wahi data aayega jo is logged in user ka hai
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+
     await connectToDB();
     
-    // Get workspaceId from URL query params
     const { searchParams } = new URL(req.url);
     const workspaceId = searchParams.get("workspaceId");
 
-    // 1. Build Dynamic Filter
-    const filter = workspaceId ? { workspaceId } : {};
+    // 🚀 FIX: Pehle check karo is user ke workspaces kaunse hain
+    const userWorkspaces = await Workspace.find({ userId }).select('_id');
+    const userWorkspaceIds = userWorkspaces.map(ws => ws._id);
 
-    // 2. Execute Parallel Aggregations (High Performance)
+    // Filter build karo. Agar ek workspace select kiya hai toh wo, warna user ke saare workspaces
+    const filter = workspaceId 
+      ? { workspaceId } 
+      : { workspaceId: { $in: userWorkspaceIds } };
+
     const [stats, activityLogs] = await Promise.all([
       (async () => {
         const docCount = await Document.countDocuments(filter);
-        const wsCount = await Workspace.countDocuments(); // Global workspaces count
-        
-        // 🚀 FIX: Fetching actual Report count instead of mocking with Message
+        // Sirf is user ke workspaces count karo
+        const wsCount = await Workspace.countDocuments({ userId }); 
         const reportCount = await Report.countDocuments(filter); 
         
         const docs = await Document.find(filter, 'chunksCount');
@@ -35,14 +44,12 @@ export async function GET(req: NextRequest) {
         };
       })(),
 
-      // Fetch Recent Activity (Sorted by latest)
       ActivityLog.find(filter)
         .sort({ createdAt: -1 })
         .limit(10)
         .lean()
     ]);
 
-    // 3. Analytics Graph Logic (Last 7 Days)
     const analytics = [
       { date: "2026-04-15", uploads: 2, reports: 1 },
       { date: "2026-04-16", uploads: 5, reports: 2 },
@@ -53,14 +60,13 @@ export async function GET(req: NextRequest) {
       { date: "2026-04-21", uploads: 1, reports: 1 },
     ];
 
-    // 🚀 THE BIG FIX: Returning EXACTLY what the frontend expects
     return NextResponse.json({
-      success: true, // Frontend was waiting for this!
+      success: true, 
       stats: {
         totalReports: stats.totalReports,
         totalWorkspaces: stats.totalWorkspaces,
         totalDocuments: stats.totalDocuments,
-        recentActivities: activityLogs // Merged directly inside stats object
+        recentActivities: activityLogs 
       },
       analytics
     });
