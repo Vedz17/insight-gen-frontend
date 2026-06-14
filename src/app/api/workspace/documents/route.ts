@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db/connect";
-import { Document, ActivityLog } from "@/lib/db/models"; 
+import { Document, ActivityLog, Workspace } from "@/lib/db/models"; // 🚀 FIX: Added Workspace
+import { auth } from '@clerk/nextjs/server'; // 🚀 FIX: Added Clerk Auth
 
 // 1. GET: Fetch all documents for a workspace
 export async function GET(req: NextRequest) {
   try {
+    // 🚀 FIX: Get User ID
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+
     await connectToDB();
 
     const { searchParams } = new URL(req.url);
@@ -12,6 +17,12 @@ export async function GET(req: NextRequest) {
 
     if (!workspaceId) {
       return NextResponse.json({ success: false, error: "Workspace ID is required" }, { status: 400 });
+    }
+
+    // 🚀 FIX: Verify Ownership - Check if this workspace actually belongs to this user
+    const workspaceOwned = await Workspace.findOne({ _id: workspaceId, userId });
+    if (!workspaceOwned) {
+      return NextResponse.json({ success: false, error: "Forbidden: You don't own this workspace" }, { status: 403 });
     }
 
     const documents = await Document.find({ workspaceId })
@@ -32,6 +43,10 @@ export async function GET(req: NextRequest) {
 // 2. DELETE: Remove a document and log the activity
 export async function DELETE(req: NextRequest) {
   try {
+    // 🚀 FIX: Get User ID
+    const { userId } = await  auth();
+    if (!userId) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+
     await connectToDB();
     
     const { searchParams } = new URL(req.url);
@@ -41,20 +56,24 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Document ID is required" }, { status: 400 });
     }
 
-    // Find document first to get details for the activity log
+    // Find document first
     const docToDelete = await Document.findById(documentId);
-    
     if (!docToDelete) {
       return NextResponse.json({ success: false, error: "Document not found" }, { status: 404 });
     }
 
-    const docName = docToDelete.name;
+    // 🚀 FIX: Verify Ownership of the Workspace where this document lives
     const workspaceId = docToDelete.workspaceId;
+    const workspaceOwned = await Workspace.findOne({ _id: workspaceId, userId });
+    if (!workspaceOwned) {
+      return NextResponse.json({ success: false, error: "Forbidden: Cannot delete from someone else's workspace" }, { status: 403 });
+    }
+
+    const docName = docToDelete.name;
 
     // Actual deletion
     await Document.findByIdAndDelete(documentId);
 
-    // Create an Activity Log entry for the Dashboard
     try {
       await ActivityLog.create({
         workspaceId: workspaceId,
@@ -64,10 +83,8 @@ export async function DELETE(req: NextRequest) {
       });
     } catch (logError) {
       console.error("Activity Log Failed:", logError);
-      // We don't block the response if logging fails
     }
 
-    // 🚀 THE FIX: Sending back valid JSON so frontend doesn't crash
     return NextResponse.json({ 
       success: true, 
       message: "Document deleted successfully" 

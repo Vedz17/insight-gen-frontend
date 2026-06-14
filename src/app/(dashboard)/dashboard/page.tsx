@@ -9,13 +9,15 @@ import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { currentUser } from '@clerk/nextjs/server';
+// 🚀 FIX: Removed server import, added Client Hook
+import { useUser } from '@clerk/nextjs';
 
-export default async function DashboardPage() {
+// 🚀 FIX: Removed 'async' from the function definition
+export default function DashboardPage() {
 
-//  Fetch Current User Info
-const user = await currentUser();
-const userName = user?.firstName || user?.emailAddresses[0]?.emailAddress.split('@')[0] || "Developer";
+  // 🚀 FIX: Using Client-side useUser hook instead of currentUser()
+  const { user, isLoaded } = useUser();
+  const userName = user?.firstName || user?.emailAddresses?.[0]?.emailAddress?.split('@')[0] || "Developer";
 
   const { workspaces } = useWorkspaceStore();
   
@@ -49,7 +51,8 @@ const userName = user?.firstName || user?.emailAddresses[0]?.emailAddress.split(
     fetchStats();
   }, []);
 
-  if (isLoading) {
+  // 🚀 FIX: Also checking if Clerk is loaded so name doesn't glitch as "Developer" initially
+  if (isLoading || !isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0B0F19]">
         <Loader2 className="animate-spin text-blue-500" size={40} />

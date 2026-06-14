@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db/connect";
-import { Message, ActivityLog } from "@/lib/db/models";
+import { Message, ActivityLog, Workspace } from "@/lib/db/models"; // 🚀 FIX: Added Workspace
+import { auth } from '@clerk/nextjs/server'; // 🚀 FIX: Added Clerk Auth
 
 export const dynamic = "force-dynamic";
 
-// Python FastAPI ka URL (ensure your FastAPI is running here)
 const BACKEND_URL = process.env.BACKEND_URL || "http://127.0.0.1:8000";
 
 export async function POST(req: Request) {
   try {
+    // 🚀 FIX: Security Check 1 - Is User Logged In?
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+
     await connectToDB();
     const body = await req.json();
     const { workspaceId, content, role } = body;
@@ -17,7 +21,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Missing workspaceId or content" }, { status: 400 });
     }
 
-    // 🧠 1. FETCH CONTEXT HISTORY (Latest 4 messages)
+    // 🚀 FIX: Security Check 2 - Does User Own This Chat Workspace?
+    const workspaceOwned = await Workspace.findOne({ _id: workspaceId, userId });
+    if (!workspaceOwned) {
+      return NextResponse.json({ success: false, error: "Forbidden: Chat access denied" }, { status: 403 });
+    }
+
+    // 🧠 1. FETCH CONTEXT HISTORY
     const historyDocs = await Message.find({ workspaceId })
       .sort({ createdAt: -1 })
       .limit(4);
@@ -50,7 +60,7 @@ export async function POST(req: Request) {
         question: content,
         domain: "NAAC Analyst",
         chat_history: chatHistory,
-        workspace_id: workspaceId // Python expects snake_case
+        workspace_id: workspaceId
       })
     });
 
@@ -58,7 +68,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "AI Engine is offline" }, { status: 502 });
     }
 
-    // 🚀 5. THE STREAMING BRIDGE
+    // 🚀 5. THE STREAMING BRIDGE (Untouched - Perfect logic)
     const stream = new ReadableStream({
       async start(controller) {
         const reader = pythonRes.body?.getReader();
@@ -74,16 +84,13 @@ export async function POST(req: Request) {
 
             const chunkText = decoder.decode(value, { stream: true });
             
-            // We enqueue the raw value so frontend gets the [[STATUS:...]] tags
             controller.enqueue(value);
             
-            // Build the full answer but ignore status tags for DB storage
             if (!chunkText.includes("[[STATUS:")) {
               aiFullAnswer += chunkText;
             }
           }
 
-          // 💾 SAVE CLEAN AI RESPONSE TO DB AFTER STREAM ENDS
           if (aiFullAnswer.trim().length > 0) {
             await Message.create({ 
               workspaceId, 

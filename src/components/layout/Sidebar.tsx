@@ -10,10 +10,20 @@ import {
 import { cn } from '@/lib/utils';
 import Swal from 'sweetalert2';
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+// 🚀 FIX: Import useUser from client library, not server
+import { useUser } from '@clerk/nextjs';
 
+// 🚀 FIX: Removed 'async' from the function
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+
+  // 🚀 FIX: Use client-side hook to get user
+  const { user, isLoaded } = useUser();
+  
+  // Logic remains same, just safely chaining properties
+  const userName = user?.firstName || user?.emailAddresses?.[0]?.emailAddress?.split('@')[0] || "User";
+  const initials = userName.substring(0, 2).toUpperCase();
   
   const { activeWorkspaceId, setActiveWorkspaceId, workspaces, fetchWorkspaces } = useWorkspaceStore();
   const [isCreating, setIsCreating] = useState(false);
@@ -94,7 +104,6 @@ export function Sidebar() {
     { name: 'Chat', icon: MessageSquare, href: '/chat' },
   ];
 
-  // 🚀 CRITICAL FIX: Enhanced focus kill style
   const noFocusStyle = {
     outline: 'none !important',
     boxShadow: 'none !important',
@@ -119,7 +128,6 @@ export function Sidebar() {
           <Link
             key={item.name}
             href={item.href}
-            // 🚀 Applied fixed style to remove white ring
             style={noFocusStyle}
             className={cn(
               "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group outline-none focus:outline-none focus:ring-0 focus-visible:outline-none active:outline-none",
@@ -180,12 +188,24 @@ export function Sidebar() {
 
       <div className="p-4 border-t border-[#1F2937] bg-[#0B0F19]/50">
         <div className="flex items-center gap-3 p-2">
-          <div className="h-9 w-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-lg shadow-blue-500/20 uppercase">
-            VB
-          </div>
+          {/* Dynamic Avatar Initials (Skeleton when loading) */}
+          {isLoaded ? (
+            <div className="h-9 w-9 rounded-full bg-blue-600 flex items-center justify-center font-bold text-white shrink-0">
+              {initials}
+            </div>
+          ) : (
+            <div className="h-9 w-9 rounded-full bg-slate-700 animate-pulse shrink-0"></div>
+          )}
+          
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-white truncate">Vedant Bhamare</p>
-            <p className="text-[10px] text-slate-500 uppercase tracking-tighter">Pro Plan</p>
+            {isLoaded ? (
+              <p className="text-sm font-semibold text-white truncate capitalize">
+                {userName}
+              </p>
+            ) : (
+              <div className="h-4 w-20 bg-slate-700 animate-pulse rounded mb-1"></div>
+            )}
+            <p className="text-[10px] text-slate-500 uppercase tracking-tighter">Free Plan</p>
           </div>
         </div>
       </div>

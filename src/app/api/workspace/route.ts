@@ -1,12 +1,23 @@
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db/connect";
-import { Workspace , Message ,ActivityLog } from "@/lib/db/models";
+import { Workspace, Message, ActivityLog } from "@/lib/db/models";
+// 🚀 FIX: Import Clerk Auth hook for Server-Side APIs
+import { auth } from '@clerk/nextjs/server';
 
 export async function GET() {
   try {
+    // 1. Get the current user ID securely from Clerk
+    const { userId } = await auth();
+    
+    // Agar koi bina login ke direct API hit kare, toh bhaga do
+    if (!userId) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+
     await connectToDB();
-    // Saare workspaces nikal lo, naye wale sabse upar (sort -1)
-    const workspaces = await Workspace.find().sort({ createdAt: -1 });
+    
+    //  FIX: Ab yahan filter laga diya. Sirf is specific user ke workspaces aayenge!
+    const workspaces = await Workspace.find({ userId }).sort({ createdAt: -1 });
     return NextResponse.json({ success: true, workspaces });
   } catch (error) {
     return NextResponse.json({ success: false, error: "Failed to fetch workspaces" });
@@ -15,22 +26,26 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    // 1. Check Auth first
+    const { userId } =  await auth();
+    if (!userId) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
-    // Senior dev tip: Fallback name hamesha rakho
     const { name } = body; 
 
     await connectToDB();
 
-    // 1. Create the Workspace (The Container)
+    // 2. Create Workspace aur asil userId daalo
     const newWorkspace = await Workspace.create({
       name: name || "New Project Workspace",
-      userId: "guest_user", // Future mein auth.userId se replace karenge
+      userId: userId, // FIX: 'guest_user' gaya kachre ke dabbe mein!
     });
 
-    // 2. Dashboard ke liye activity log banao (Optional but good)
     await ActivityLog.create({
       workspaceId: newWorkspace._id,
-      type: 'chat', // Initial setup activity
+      type: 'chat',
       title: `Created workspace: ${newWorkspace.name}`
     });
 
@@ -42,19 +57,16 @@ export async function POST(req: Request) {
 
   } catch (error: any) {
     console.error("Workspace creation failed:", error);
-    return NextResponse.json({ 
-      success: false, 
-      error: "Failed to create workspace" 
-    }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Failed to create workspace" }, { status: 500 });
   }
 }
 
-
-// 🚀 THE FIX: Frontend ko crash hone se bachane ke liye PUT method
 export async function PUT(req: Request) {
   try {
-    // Abhi ke liye hum bas isko 'Success' bol denge taaki UI hang na ho.
-    // (Baad mein tu chahe toh asli DB rename logic daal sakta hai)
+    // Auth check here too just for safety
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+
     return NextResponse.json({ success: true, message: "Workspace renamed successfully" });
   } catch (error) {
     return NextResponse.json({ success: false, error: "Failed to update workspace" });
@@ -63,16 +75,23 @@ export async function PUT(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+
     await connectToDB();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
     if (!id) return NextResponse.json({ success: false, error: "ID missing" });
 
-    // 1. Workspace Delete karo
+    //  FIX: Security Layer - Pehle verify karo ki ye workspace is bande ka hai bhi ya nahi
+    const workspaceToVerify = await Workspace.findOne({ _id: id, userId });
+    if (!workspaceToVerify) {
+      return NextResponse.json({ success: false, error: "Action not allowed or Not Found" }, { status: 403 });
+    }
+
+    // Ab safely delete karo
     await Workspace.findByIdAndDelete(id);
-    
-    // 2. Us workspace ke saare messages bhi Delete karo (Storage bachane ke liye)
     await Message.deleteMany({ workspaceId: id });
 
     return NextResponse.json({ success: true, message: "Chat deleted!" });
