@@ -9,8 +9,14 @@ import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { currentUser } from '@clerk/nextjs/server';
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+
+//  Fetch Current User Info
+const user = await currentUser();
+const userName = user?.firstName || user?.emailAddresses[0]?.emailAddress.split('@')[0] || "Developer";
+
   const { workspaces } = useWorkspaceStore();
   
   const [stats, setStats] = useState({
@@ -94,7 +100,7 @@ export default function DashboardPage() {
   return (
     <div className="p-8 bg-[#0B0F19] min-h-screen text-white">
       <header className="mb-10">
-        <h1 className="text-4xl font-black mb-2 tracking-tight">Welcome back, Vedant</h1>
+        <h1 className="text-4xl font-black mb-2 tracking-tight">Welcome back, <span className="capitalize">{userName}</span></h1>
         <p className="text-slate-400 font-medium">
           Everything looks good. You have processed <span className="text-blue-500 font-bold">{stats.totalReports}</span> reports so far.
         </p>
