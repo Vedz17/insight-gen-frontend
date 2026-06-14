@@ -37,37 +37,65 @@ export default function ChatArena() {
     setMessages(prev => [...prev, userMsg]);
     setInput("");
     setIsThinking(true);
+    setAgentStatus("Initializing");
 
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId: activeWorkspaceId, content: input, role: 'user' })
+        body: JSON.stringify({ workspaceId: activeWorkspaceId, content: userMsg.content, role: 'user' })
       });
 
+      if (!response.ok) {
+        throw new Error("Failed to connect to the AI Engine");
+      }
+
       const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
+      const decoder = new TextDecoder("utf-8"); // 🚀 FIX: Explicitly set UTF-8
       let aiContent = "";
       const aiMsgId = (Date.now() + 1).toString();
-      setMessages(prev => [...prev, { id: aiMsgId, role: 'ai', content: "" }]);
+      
+      // 🚀 FIX: Insert a temporary "thinking" message first
+      setMessages(prev => [...prev, { id: aiMsgId, role: 'ai', content: "💭 Thinking..." }]);
+
+      let isFirstChunk = true;
 
       while (true) {
         const { done, value } = await reader?.read()!;
         if (done) break;
-        const chunk = decoder.decode(value);
         
-        // 🚀 STATUS PARSER: Pakadta hai [[STATUS:...]] tags ko
+        // 🚀 FIX: Properly decode stream value
+        const chunk = decoder.decode(value, { stream: true });
+        
         if (chunk.includes("[[STATUS:")) {
           const statusMatch = chunk.match(/\[\[STATUS:(.*?)\]\]/);
           if (statusMatch) setAgentStatus(statusMatch[1]);
           continue; 
         }
 
-        aiContent += chunk;
-        setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: aiContent } : m));
+        if (chunk.includes("[[ERROR:")) {
+            aiContent += "\n\n⚠️ " + chunk.replace("[[ERROR:", "").replace("]]", "");
+        } else {
+            aiContent += chunk;
+        }
+        
+        // 🚀 FIX: Remove the "thinking" placeholder on first real data
+        if (isFirstChunk && aiContent.trim().length > 0) {
+            isFirstChunk = false;
+        }
+
+        // Only update UI if we actually have content, else keep thinking placeholder
+        const displayContent = aiContent.length > 0 ? aiContent : "💭 Thinking...";
+        
+        setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: displayContent } : m));
       }
     } catch (error) {
       console.error(error);
+      setMessages(prev => [...prev, { 
+          id: Date.now().toString(), 
+          role: 'ai', 
+          content: "🚨 Connection failed or timed out. Please check if the backend is running." 
+      }]);
     } finally {
       setIsThinking(false);
       setAgentStatus("Idle");
@@ -112,8 +140,15 @@ export default function ChatArena() {
                 {msg.role === 'user' ? <User size={24} /> : <Bot size={24} />}
               </div>
               <div className={`max-w-[75%] p-6 rounded-[2rem] text-sm leading-relaxed ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-[#0B0F19] text-[#E5E7EB] border border-[#1F2937] rounded-tl-none'}`}>
+                {/* 🚀 FIX: Beautiful pulse animation for the "Thinking..." state */}
                 <div className="prose prose-invert prose-sm max-w-none font-medium">
-                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  {msg.content === "💭 Thinking..." ? (
+                    <div className="flex items-center gap-2 text-slate-400 animate-pulse">
+                        <Loader2 className="animate-spin" size={16}/> {msg.content}
+                    </div>
+                  ) : (
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  )}
                 </div>
               </div>
             </div>
