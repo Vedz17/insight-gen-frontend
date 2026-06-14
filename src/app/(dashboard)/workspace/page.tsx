@@ -8,33 +8,23 @@ import { useRouter } from 'next/navigation';
 
 export default function WorkspacePage() {
   const router = useRouter();
-  // Zustand store se data aur functions nikalna
-  const { workspaces, setWorkspaces, setActiveWorkspace } = useWorkspaceStore();
   
-  // 🚀 FIX: Correctly named the setter function to setLoading
+  // 🚀 FIX: Sirf fetchWorkspaces extract kiya
+  const { workspaces, setActiveWorkspace, fetchWorkspaces } = useWorkspaceStore();
   const [loading, setLoading] = useState(true);
 
-  // 🔄 Purana Logic: Fetch Workspaces from MongoDB
+  // 🚀 FIX: Ab naya global method use hoga jo cache ko override karega
   useEffect(() => {
-    const fetchWorkspaces = async () => {
-      try {
-        const res = await fetch("/api/workspace");
-        const data = await res.json();
-        if (data.success) {
-          setWorkspaces(data.workspaces);
-        }
-      } catch (error) {
-        console.error("Failed to load workspaces", error);
-      } finally {
-        setLoading(false); // Now this works perfectly
-      }
+    const loadData = async () => {
+      await fetchWorkspaces();
+      setLoading(false);
     };
-    fetchWorkspaces();
-  }, [setWorkspaces]);
+    loadData();
+  }, [fetchWorkspaces]);
 
   const handleSelectWorkspace = (id: string) => {
-    setActiveWorkspace(id); // Zustand store update
-    router.push('/documents'); // Chat page par redirect
+    setActiveWorkspace(id); 
+    router.push('/documents'); 
   };
 
   return (
@@ -46,7 +36,7 @@ export default function WorkspacePage() {
           <p className="text-[#9CA3AF] mt-2 text-lg">Select a project environment to start generating insights.</p>
         </div>
         <button 
-          onClick={() => router.push('/documents')} // Pehle doc upload fir workspace
+          onClick={() => router.push('/documents')} 
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:scale-105 active:scale-95"
         >
           <Plus size={20} />
@@ -79,7 +69,6 @@ export default function WorkspacePage() {
               </div>
 
               <h3 className="text-xl font-bold text-[#E5E7EB] mb-2 truncate group-hover:text-white">
-                {/* 🚀 BUG FIXED HERE: Fetches 'name' first to match sidebar */}
                 {ws.name  || "Untitled Workspace"}
               </h3>
               

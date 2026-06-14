@@ -14,7 +14,7 @@ interface WorkspaceState {
   setActiveWorkspace: (id: string | null) => void; 
   setWorkspaces: (workspaces: Workspace[]) => void;
   addWorkspace: (workspace: Workspace) => void;
-  fetchWorkspaces: () => Promise<void>; // 🚀 NAYA: Global Fetch Function
+  fetchWorkspaces: () => Promise<void>; 
 }
 
 export const useWorkspaceStore = create<WorkspaceState>()(
@@ -32,10 +32,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           workspaces: [workspace, ...state.workspaces],
         })),
 
-      // 🚀 THE FIX: Ab Zustand khud API call karega aur apna array update karega
-      fetchWorkspaces: async () => {
+      fetchWorkspaces: async () => { 
         try {
-          const res = await fetch("/api/workspace");
+          // 🚀 FIX: Ab cache purana data nahi dega
+          const res = await fetch("/api/workspace", { cache: 'no-store' });
           const data = await res.json();
           if (data.success) {
             set({ workspaces: data.workspaces });

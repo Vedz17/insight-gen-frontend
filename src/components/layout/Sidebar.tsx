@@ -10,18 +10,13 @@ import {
 import { cn } from '@/lib/utils';
 import Swal from 'sweetalert2';
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
-// 🚀 FIX: Import useUser from client library, not server
 import { useUser } from '@clerk/nextjs';
 
-// 🚀 FIX: Removed 'async' from the function
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
 
-  // 🚀 FIX: Use client-side hook to get user
   const { user, isLoaded } = useUser();
-  
-  // Logic remains same, just safely chaining properties
   const userName = user?.firstName || user?.emailAddresses?.[0]?.emailAddress?.split('@')[0] || "User";
   const initials = userName.substring(0, 2).toUpperCase();
   
@@ -55,6 +50,7 @@ export function Sidebar() {
         const data = await res.json();
         
         if (data.success) {
+          // 🚀 FIX: Pehle data fetch karo aur active set karo
           await fetchWorkspaces(); 
           setActiveWorkspaceId(data.workspaceId); 
           
@@ -67,7 +63,8 @@ export function Sidebar() {
             showConfirmButton: false
           });
           
-          router.push('/documents');
+          // 🚀 FIX: router.push() ki jagah hard redirect for fresh UI sync
+          window.location.href = '/documents';
         }
       } catch (err) {
         Swal.fire("Error", "Bann nahi paya!", "error");
@@ -188,7 +185,6 @@ export function Sidebar() {
 
       <div className="p-4 border-t border-[#1F2937] bg-[#0B0F19]/50">
         <div className="flex items-center gap-3 p-2">
-          {/* Dynamic Avatar Initials (Skeleton when loading) */}
           {isLoaded ? (
             <div className="h-9 w-9 rounded-full bg-blue-600 flex items-center justify-center font-bold text-white shrink-0">
               {initials}
@@ -205,7 +201,7 @@ export function Sidebar() {
             ) : (
               <div className="h-4 w-20 bg-slate-700 animate-pulse rounded mb-1"></div>
             )}
-            <p className="text-[10px] text-slate-500 uppercase tracking-tighter">Free Plan</p>
+            <p className="text-[10px] text-slate-500 uppercase tracking-tighter">Pro Plan</p>
           </div>
         </div>
       </div>
