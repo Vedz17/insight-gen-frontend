@@ -4,6 +4,7 @@ import { Message, ActivityLog, Workspace } from "@/lib/db/models"; // 🚀 FIX: 
 import { auth } from '@clerk/nextjs/server'; // 🚀 FIX: Added Clerk Auth
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; //to ressolve api timeout issue 
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://127.0.0.1:8000";
 

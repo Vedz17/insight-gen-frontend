@@ -39,6 +39,10 @@ export default function ChatArena() {
     setIsThinking(true);
     setAgentStatus("Initializing");
 
+    // 🚀 CREATE BUBBLE IMMEDIATELY
+    const aiMsgId = (Date.now() + 1).toString();
+    setMessages(prev => [...prev, { id: aiMsgId, role: 'ai', content: "💭 Thinking..." }]);
+
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -51,51 +55,51 @@ export default function ChatArena() {
       }
 
       const reader = response.body?.getReader();
-      const decoder = new TextDecoder("utf-8"); // 🚀 FIX: Explicitly set UTF-8
+      const decoder = new TextDecoder("utf-8");
       let aiContent = "";
-      const aiMsgId = (Date.now() + 1).toString();
-      
-      // 🚀 FIX: Insert a temporary "thinking" message first
-      setMessages(prev => [...prev, { id: aiMsgId, role: 'ai', content: "💭 Thinking..." }]);
-
       let isFirstChunk = true;
 
       while (true) {
         const { done, value } = await reader?.read()!;
         if (done) break;
         
-        // 🚀 FIX: Properly decode stream value
+        // 🚀 SAFE DECODE
         const chunk = decoder.decode(value, { stream: true });
+        let textChunk = chunk;
         
-        if (chunk.includes("[[STATUS:")) {
-          const statusMatch = chunk.match(/\[\[STATUS:(.*?)\]\]/);
+        // 🚀 SEPARATE STATUS AND TEXT
+        if (textChunk.includes("[[STATUS:")) {
+          const statusMatch = textChunk.match(/\[\[STATUS:(.*?)\]\]/);
           if (statusMatch) setAgentStatus(statusMatch[1]);
-          continue; 
+          // Strip status tag so we don't render it, but KEEP the rest of the text!
+          textChunk = textChunk.replace(/\[\[STATUS:.*?\]\]/g, ""); 
         }
 
-        if (chunk.includes("[[ERROR:")) {
-            aiContent += "\n\n⚠️ " + chunk.replace("[[ERROR:", "").replace("]]", "");
-        } else {
-            aiContent += chunk;
+        // 🚀 APPEND ONLY ACTUAL TEXT
+        if (textChunk.trim().length > 0) {
+          if (textChunk.includes("[[ERROR:")) {
+              aiContent += "\n\n⚠️ " + textChunk.replace(/\[\[ERROR:.*?\]\]/g, "");
+          } else {
+              aiContent += textChunk;
+          }
         }
         
-        // 🚀 FIX: Remove the "thinking" placeholder on first real data
         if (isFirstChunk && aiContent.trim().length > 0) {
             isFirstChunk = false;
         }
 
-        // Only update UI if we actually have content, else keep thinking placeholder
         const displayContent = aiContent.length > 0 ? aiContent : "💭 Thinking...";
-        
         setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: displayContent } : m));
       }
+
+      // 🚀 TIMEOUT FALLBACK: If Vercel cuts the cord at 15s before python sent text
+      if (aiContent.trim().length === 0) {
+         setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: "⚠️ AI Engine took too long to respond (Vercel Timeout). Please try again in a few seconds." } : m));
+      }
+
     } catch (error) {
       console.error(error);
-      setMessages(prev => [...prev, { 
-          id: Date.now().toString(), 
-          role: 'ai', 
-          content: "🚨 Connection failed or timed out. Please check if the backend is running." 
-      }]);
+      setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: "🚨 Connection failed. AI Engine might be offline." } : m));
     } finally {
       setIsThinking(false);
       setAgentStatus("Idle");
@@ -123,7 +127,7 @@ export default function ChatArena() {
                   className="bg-[#0B0F19] border border-[#1F2937] text-blue-400 text-xs font-bold py-1.5 pl-4 pr-10 rounded-full appearance-none outline-none cursor-pointer"
                 >
                   <option value="" disabled>Select Workspace</option>
-                  {workspaces.map(ws => <option key={ws._id} value={ws._id}>{ws.name }</option>)}
+                  {workspaces.map(ws => <option key={ws._id} value={ws._id}>{ws.name}</option>)}
                 </select>
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
               </div>
@@ -140,7 +144,6 @@ export default function ChatArena() {
                 {msg.role === 'user' ? <User size={24} /> : <Bot size={24} />}
               </div>
               <div className={`max-w-[75%] p-6 rounded-[2rem] text-sm leading-relaxed ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-[#0B0F19] text-[#E5E7EB] border border-[#1F2937] rounded-tl-none'}`}>
-                {/* 🚀 FIX: Beautiful pulse animation for the "Thinking..." state */}
                 <div className="prose prose-invert prose-sm max-w-none font-medium">
                   {msg.content === "💭 Thinking..." ? (
                     <div className="flex items-center gap-2 text-slate-400 animate-pulse">
