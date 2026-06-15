@@ -5,15 +5,15 @@ import { Plus, Folder, Calendar, ArrowRight, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useRouter } from 'next/navigation';
+import Swal from 'sweetalert2';
 
 export default function WorkspacePage() {
   const router = useRouter();
   
-  // 🚀 FIX: Sirf fetchWorkspaces extract kiya
   const { workspaces, setActiveWorkspace, fetchWorkspaces } = useWorkspaceStore();
   const [loading, setLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
 
-  // 🚀 FIX: Ab naya global method use hoga jo cache ko override karega
   useEffect(() => {
     const loadData = async () => {
       await fetchWorkspaces();
@@ -27,6 +27,51 @@ export default function WorkspacePage() {
     router.push('/documents'); 
   };
 
+  const handleCreateWorkspace = async () => {
+    const { value: wsName } = await Swal.fire({
+      title: 'New Project Name',
+      input: 'text',
+      inputPlaceholder: 'e.g. Semester 6 Audit',
+      showCancelButton: true,
+      background: '#111827',
+      color: '#fff',
+      confirmButtonColor: '#2563eb',
+      inputValidator: (value) => !value && 'Naam likhna zaroori hai bhai!'
+    });
+
+    if (wsName) {
+      setIsCreating(true);
+      try {
+        const res = await fetch("/api/workspace", {
+          method: "POST",
+          body: JSON.stringify({ name: wsName }),
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+          await fetchWorkspaces(); 
+          setActiveWorkspace(data.workspaceId); 
+          
+          Swal.fire({
+            icon: 'success',
+            title: 'Workspace Live!',
+            background: '#111827',
+            color: '#fff',
+            timer: 1500,
+            showConfirmButton: false
+          });
+          
+          router.push('/documents');
+        }
+      } catch (err) {
+        Swal.fire("Error", "Bann nahi paya!", "error");
+      } finally {
+        setIsCreating(false);
+      }
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-10">
       {/* Header Area */}
@@ -36,11 +81,12 @@ export default function WorkspacePage() {
           <p className="text-[#9CA3AF] mt-2 text-lg">Select a project environment to start generating insights.</p>
         </div>
         <button 
-          onClick={() => router.push('/documents')} 
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:scale-105 active:scale-95"
+          onClick={handleCreateWorkspace} 
+          disabled={isCreating}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:scale-105 active:scale-95 disabled:bg-slate-700 disabled:hover:scale-100"
         >
-          <Plus size={20} />
-          New Project
+          {isCreating ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20} />}
+          {isCreating ? "Creating..." : "New Project"}
         </button>
       </div>
 
