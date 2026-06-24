@@ -1,64 +1,94 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db/connect";
-import { Document, Workspace, Message, ActivityLog, Report } from "@/lib/db/models"; 
-// 🚀 FIX: Clerk auth import kiya
+import { Document, Workspace, ActivityLog, Report } from "@/lib/db/models"; 
 import { auth } from '@clerk/nextjs/server';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
-    // 🚀 FIX: Security check - sir wahi data aayega jo is logged in user ka hai
+    // 🛡️ SECURITY: Get current logged-in user
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
 
     await connectToDB();
     
     const { searchParams } = new URL(req.url);
-    const workspaceId = searchParams.get("workspaceId");
+    const workspaceIdParam = searchParams.get("workspaceId");
 
-    // 🚀 FIX: Pehle check karo is user ke workspaces kaunse hain
+    // 1. Fetch ALL workspaces belonging to THIS user
     const userWorkspaces = await Workspace.find({ userId }).select('_id');
     const userWorkspaceIds = userWorkspaces.map(ws => ws._id);
+    const userWorkspaceIdsStr = userWorkspaceIds.map(id => id.toString()); // For string-based refs
 
-    // Filter build karo. Agar ek workspace select kiya hai toh wo, warna user ke saare workspaces
-    const filter = workspaceId 
-      ? { workspaceId } 
-      : { workspaceId: { $in: userWorkspaceIds } };
+    // 🚀 Check if user is completely new (0 workspaces)
+    if (userWorkspaceIds.length === 0) {
+      return NextResponse.json({
+        success: true,
+        stats: { totalReports: 0, totalWorkspaces: 0, totalDocuments: 0, recentActivities: [] },
+        analytics: [] // Returns empty to trigger frontend "Blank State" gracefully
+      });
+    }
 
-    const [stats, activityLogs] = await Promise.all([
+    // Filter build karo. Agar UI se specific workspace bheja hai toh wo, warna user ke saare.
+    const objectIdFilter = workspaceIdParam ? { workspaceId: workspaceIdParam } : { workspaceId: { $in: userWorkspaceIds } };
+    const stringIdFilter = workspaceIdParam ? { workspaceId: workspaceIdParam } : { workspaceId: { $in: userWorkspaceIdsStr } };
+
+    // 2. Parallel Database Queries for maximum speed
+    const [stats, activityLogs, recentLogsForAnalytics] = await Promise.all([
       (async () => {
-        const docCount = await Document.countDocuments(filter);
-        // Sirf is user ke workspaces count karo
+        const docCount = await Document.countDocuments(objectIdFilter);
         const wsCount = await Workspace.countDocuments({ userId }); 
-        const reportCount = await Report.countDocuments(filter); 
+        const reportCount = await Report.countDocuments(stringIdFilter); // Report schema uses string for workspaceId
         
-        const docs = await Document.find(filter, 'chunksCount');
-        const totalChunks = docs.reduce((acc, doc) => acc + (doc.chunksCount || 0), 0);
-
         return {
           totalDocuments: docCount,
           totalReports: reportCount, 
-          totalChunks: totalChunks,
           totalWorkspaces: wsCount
         };
       })(),
 
-      ActivityLog.find(filter)
+      // Fetch Recent Activity for the activity list UI
+      ActivityLog.find(objectIdFilter)
         .sort({ createdAt: -1 })
         .limit(10)
-        .lean()
+        .lean(),
+
+      // Fetch last 7 days logs for the Chart Analytics
+      (async () => {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        return ActivityLog.find({
+          ...objectIdFilter,
+          createdAt: { $gte: sevenDaysAgo }
+        }).select('type createdAt').lean();
+      })()
     ]);
 
-    const analytics = [
-      { date: "2026-04-15", uploads: 2, reports: 1 },
-      { date: "2026-04-16", uploads: 5, reports: 2 },
-      { date: "2026-04-17", uploads: 3, reports: 1 },
-      { date: "2026-04-18", uploads: 8, reports: 4 },
-      { date: "2026-04-19", uploads: 4, reports: 2 },
-      { date: "2026-04-20", uploads: 6, reports: 3 },
-      { date: "2026-04-21", uploads: 1, reports: 1 },
-    ];
+    // 3. 🧠 SMART ANALYTICS BUILDER (No hardcoded data!)
+    // Generate an array of the last 7 dates (e.g., ['2026-06-18', '2026-06-19', ...])
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return d.toISOString().split('T')[0];
+    });
+
+    // Initialize map with 0s so UI graph doesn't break on empty days
+    const analyticsMap = last7Days.reduce((acc: any, date: string) => {
+      acc[date] = { date, uploads: 0, reports: 0 };
+      return acc;
+    }, {});
+
+    // Populate actual data from ActivityLog
+    recentLogsForAnalytics.forEach((log: any) => {
+      const dateStr = log.createdAt.toISOString().split('T')[0];
+      if (analyticsMap[dateStr]) {
+        if (log.type === 'upload') analyticsMap[dateStr].uploads += 1;
+        if (log.type === 'report') analyticsMap[dateStr].reports += 1;
+      }
+    });
+
+    const analytics = Object.values(analyticsMap); // Convert map back to array for Recharts
 
     return NextResponse.json({
       success: true, 

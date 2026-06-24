@@ -9,16 +9,29 @@ import { motion } from 'framer-motion';
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import ReactMarkdown from 'react-markdown';
 import Swal from 'sweetalert2';
+// 🚀 FIX: Import Clerk Hook
+import { useUser } from '@clerk/nextjs';
 
 export default function ChatArena() {
+  const { user, isLoaded } = useUser();
   const { workspaces, activeWorkspaceId, setActiveWorkspace } = useWorkspaceStore();
-  const [messages, setMessages] = useState([
-    { id: '1', role: 'ai', content: "Hello Vedant! I am the **InsightGen Analyst**. Select your workspace above to start the multi-agent audit." }
-  ]);
+  
+  // 🚀 FIX: Start with a neutral loading state to prevent hydration mismatch
+  const [messages, setMessages] = useState<{id: string, role: string, content: string}[]>([]);
   const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
   const [agentStatus, setAgentStatus] = useState("Idle");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // 🚀 FIX: Dynamically set greeting when user loads
+  useEffect(() => {
+    if (isLoaded && messages.length === 0) {
+      const userName = user?.firstName || "User";
+      setMessages([
+        { id: '1', role: 'ai', content: `Hello **${userName}**! I am the **InsightGen Analyst**. Select your workspace above to start the multi-agent audit.` }
+      ]);
+    }
+  }, [isLoaded, user, messages.length]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -29,7 +42,7 @@ export default function ChatArena() {
   const handleSend = async () => {
     if (!input.trim() || isThinking) return;
     if (!activeWorkspaceId) {
-      Swal.fire("Workspace Required", "Pehle workspace select karle bhai!", "warning");
+      Swal.fire("Workspace Required", "Please select a workspace first!", "warning");
       return;
     }
 
@@ -39,7 +52,6 @@ export default function ChatArena() {
     setIsThinking(true);
     setAgentStatus("Initializing");
 
-    // 🚀 CREATE BUBBLE IMMEDIATELY
     const aiMsgId = (Date.now() + 1).toString();
     setMessages(prev => [...prev, { id: aiMsgId, role: 'ai', content: "💭 Thinking..." }]);
 
@@ -50,9 +62,7 @@ export default function ChatArena() {
         body: JSON.stringify({ workspaceId: activeWorkspaceId, content: userMsg.content, role: 'user' })
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to connect to the AI Engine");
-      }
+      if (!response.ok) throw new Error("Failed to connect to the AI Engine");
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder("utf-8");
@@ -63,19 +73,14 @@ export default function ChatArena() {
         const { done, value } = await reader?.read()!;
         if (done) break;
         
-        // 🚀 SAFE DECODE
-        const chunk = decoder.decode(value, { stream: true });
-        let textChunk = chunk;
+        let textChunk = decoder.decode(value, { stream: true });
         
-        // 🚀 SEPARATE STATUS AND TEXT
         if (textChunk.includes("[[STATUS:")) {
           const statusMatch = textChunk.match(/\[\[STATUS:(.*?)\]\]/);
           if (statusMatch) setAgentStatus(statusMatch[1]);
-          // Strip status tag so we don't render it, but KEEP the rest of the text!
           textChunk = textChunk.replace(/\[\[STATUS:.*?\]\]/g, ""); 
         }
 
-        // 🚀 APPEND ONLY ACTUAL TEXT
         if (textChunk.trim().length > 0) {
           if (textChunk.includes("[[ERROR:")) {
               aiContent += "\n\n⚠️ " + textChunk.replace(/\[\[ERROR:.*?\]\]/g, "");
@@ -84,19 +89,15 @@ export default function ChatArena() {
           }
         }
         
-        if (isFirstChunk && aiContent.trim().length > 0) {
-            isFirstChunk = false;
-        }
+        if (isFirstChunk && aiContent.trim().length > 0) isFirstChunk = false;
 
         const displayContent = aiContent.length > 0 ? aiContent : "💭 Thinking...";
         setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: displayContent } : m));
       }
 
-      // 🚀 TIMEOUT FALLBACK: If Vercel cuts the cord at 15s before python sent text
       if (aiContent.trim().length === 0) {
-         setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: "⚠️ AI Engine took too long to respond (Vercel Timeout). Please try again in a few seconds." } : m));
+         setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: "⚠️ AI Engine took too long to respond (Timeout). Please try again." } : m));
       }
-
     } catch (error) {
       console.error(error);
       setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: "🚨 Connection failed. AI Engine might be offline." } : m));
@@ -178,7 +179,7 @@ export default function ChatArena() {
         </div>
       </div>
 
-      {/* 🛡️ RIGHT SIDE: AGENT ORCHESTRATION (THE MONITOR) */}
+      {/* 🛡️ RIGHT SIDE: AGENT ORCHESTRATION */}
       <div className="w-80 hidden xl:flex flex-col bg-[#111827] border border-[#1F2937] rounded-[2rem] p-8 space-y-10 shadow-xl">
         <div className="space-y-1">
           <h3 className="font-black text-[#E5E7EB] flex items-center gap-2 text-[11px] uppercase tracking-[0.25em]">
@@ -189,24 +190,9 @@ export default function ChatArena() {
         
         <div className="space-y-8">
           {[
-            { 
-              name: "Researcher", 
-              active: agentStatus.toLowerCase().includes("researcher") || agentStatus.toLowerCase().includes("scanning"), 
-              icon: Search, 
-              color: "bg-blue-500" 
-            },
-            { 
-              name: "Writer", 
-              active: agentStatus.toLowerCase().includes("writer") || agentStatus.toLowerCase().includes("drafting") || (isThinking && agentStatus === "Initializing"), 
-              icon: Cpu, 
-              color: "bg-purple-500" 
-            },
-            { 
-              name: "Auditor", 
-              active: agentStatus.toLowerCase().includes("auditor") || agentStatus.toLowerCase().includes("validating"), 
-              icon: ShieldCheck, 
-              color: "bg-green-500" 
-            }
+            { name: "Researcher", active: agentStatus.toLowerCase().includes("researcher") || agentStatus.toLowerCase().includes("scanning"), icon: Search, color: "bg-blue-500" },
+            { name: "Writer", active: agentStatus.toLowerCase().includes("writer") || agentStatus.toLowerCase().includes("drafting") || (isThinking && agentStatus === "Initializing"), icon: Cpu, color: "bg-purple-500" },
+            { name: "Auditor", active: agentStatus.toLowerCase().includes("auditor") || agentStatus.toLowerCase().includes("validating"), icon: ShieldCheck, color: "bg-green-500" }
           ].map((agent, i) => (
             <div key={i} className={`space-y-3 transition-all duration-500 ${agent.active ? 'opacity-100 scale-105' : 'opacity-30 scale-100'}`}>
                <div className="flex justify-between items-center">

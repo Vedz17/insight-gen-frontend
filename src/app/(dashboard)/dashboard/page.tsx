@@ -3,21 +3,17 @@
 import React, { useEffect, useState } from 'react';
 import { 
   FileText, LayoutGrid, Activity, 
-  ArrowUpRight, Clock, Loader2, TrendingUp 
+  ArrowUpRight, Clock, Loader2, TrendingUp, FolderOpen
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-// 🚀 FIX: Removed server import, added Client Hook
 import { useUser } from '@clerk/nextjs';
 
-// 🚀 FIX: Removed 'async' from the function definition
 export default function DashboardPage() {
-
-  // 🚀 FIX: Using Client-side useUser hook instead of currentUser()
   const { user, isLoaded } = useUser();
-  const userName = user?.firstName || user?.emailAddresses?.[0]?.emailAddress?.split('@')[0] || "Developer";
+  const userName = user?.firstName || user?.emailAddresses?.[0]?.emailAddress?.split('@')[0] || "User";
 
   const { workspaces } = useWorkspaceStore();
   
@@ -31,7 +27,6 @@ export default function DashboardPage() {
   const [analytics, setAnalytics] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 🔄 Fetch Stats from your existing API
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -51,7 +46,6 @@ export default function DashboardPage() {
     fetchStats();
   }, []);
 
-  // 🚀 FIX: Also checking if Clerk is loaded so name doesn't glitch as "Developer" initially
   if (isLoading || !isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0B0F19]">
@@ -60,13 +54,16 @@ export default function DashboardPage() {
     );
   }
 
-  // 🚀 Configuration for Redirection & UI
+  // 🚀 FIX: Dynamic Usage Percentage (Mock limits: 100 docs for Free tier)
+  const usagePercentage = Math.min(Math.round((stats.totalDocuments / 100) * 100), 100);
+  const planType = stats.totalDocuments > 50 ? "Pro Plan" : "Free Tier";
+
   const statCards = [
     { 
       title: "Total Reports", 
       value: stats.totalReports, 
       icon: <FileText size={20} className="text-blue-500" />, 
-      trend: "+12%", 
+      trend: stats.totalReports > 0 ? "Generated" : "Start now", 
       path: "/reports",
       color: "text-blue-500",
       glow: "group-hover:border-blue-500/50"
@@ -91,10 +88,10 @@ export default function DashboardPage() {
     },
     { 
       title: "Usage Stats", 
-      value: "84%", 
+      value: `${usagePercentage}%`, 
       icon: <TrendingUp size={20} className="text-orange-500" />, 
-      trend: "Pro Plan", 
-      path: "/settings", // Redirect to settings/billing
+      trend: planType, 
+      path: "/settings",
       color: "text-orange-500",
       glow: "group-hover:border-orange-500/50"
     }
@@ -109,7 +106,7 @@ export default function DashboardPage() {
         </p>
       </header>
 
-      {/* 🚀 STATS CARDS WITH REDIRECTION */}
+      {/* STATS CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         {statCards.map((card, i) => (
           <Link href={card.path} key={i}>
@@ -135,7 +132,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* 📊 ANALYSIS OVERVIEW (PRESERVED CHART LOGIC) */}
+        {/* 📊 ANALYSIS OVERVIEW */}
         <div className="lg:col-span-2 bg-[#111827] border border-[#1F2937] rounded-[2.5rem] p-8 flex flex-col shadow-2xl">
            <div className="flex justify-between items-center mb-8">
               <h2 className="text-xl font-bold">Analysis Overview</h2>
@@ -145,6 +142,7 @@ export default function DashboardPage() {
            </div>
            
            <div className="w-full h-[320px]">
+             {/* 🚀 FIX: Premium Empty State if no analytics data */}
              {analytics.length > 0 ? (
                <ResponsiveContainer width="100%" height="100%">
                  <BarChart data={analytics} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -173,23 +171,27 @@ export default function DashboardPage() {
                </ResponsiveContainer>
              ) : (
                <div className="h-full w-full border border-[#1F2937] border-dashed rounded-[2rem] flex flex-col items-center justify-center bg-[#0B0F19]/30">
-                  <Loader2 className="animate-spin text-blue-500 mb-2" size={24} />
-                  <p className="text-slate-500 italic text-sm">Syncing latest metrics...</p>
+                  <FolderOpen className="text-slate-700 mb-3" size={32} />
+                  <p className="text-slate-400 font-bold mb-1">No data to display yet</p>
+                  <p className="text-slate-500 text-sm">Upload documents to see your processing trends.</p>
                </div>
              )}
            </div>
         </div>
 
-        {/* 🕒 RECENT ACTIVITY (PRESERVED DATA MAPPING) */}
+        {/* 🕒 RECENT ACTIVITY */}
         <div className="bg-[#111827] border border-[#1F2937] rounded-[2.5rem] p-8 flex flex-col shadow-2xl">
           <div className="flex justify-between items-center mb-8">
             <h2 className="text-xl font-bold">Recent Activity</h2>
-            <Link href="/activity">
-               <button className="text-blue-500 text-[10px] font-black uppercase tracking-widest hover:text-blue-400 transition-colors">View all</button>
-            </Link>
+            {stats.recentActivities && stats.recentActivities.length > 0 && (
+              <Link href="/activity">
+                 <button className="text-blue-500 text-[10px] font-black uppercase tracking-widest hover:text-blue-400 transition-colors">View all</button>
+              </Link>
+            )}
           </div>
           
           <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+            {/* 🚀 FIX: Better empty state layout */}
             {stats.recentActivities && stats.recentActivities.length > 0 ? (
               stats.recentActivities.slice(0, 6).map((activity: any) => (
                 <div key={activity._id} className="flex items-center gap-4 group cursor-pointer hover:bg-[#1F2937]/50 p-3 -mx-3 rounded-2xl transition-all">
@@ -207,9 +209,10 @@ export default function DashboardPage() {
                 </div>
               ))
             ) : (
-              <div className="h-full flex flex-col items-center justify-center py-20">
+              <div className="h-full flex flex-col items-center justify-center py-16">
                 <Clock className="text-slate-800 mb-4" size={40} />
-                <p className="text-slate-500 text-sm italic">No recent activity.</p>
+                <p className="text-slate-400 font-bold mb-1">It's quiet here</p>
+                <p className="text-slate-500 text-[11px] uppercase tracking-widest font-black">No recent activity</p>
               </div>
             )}
           </div>
