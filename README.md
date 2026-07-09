@@ -25,30 +25,25 @@ InsightGen is a production-grade multi-tenant SaaS application engineered to aut
 ## 🚀 Step-by-Step Setup
 
 **1. Clone the repository**
-\`\`\`bash
-git clone https://github.com/your-username/insightgen-client.git
-cd insightgen-client
-\`\`\`
+```bash
+git clone [https://github.com/Vedz17/insight-gen-frontend.git](https://github.com/Vedz17/insight-gen-frontend.git)
+cd insight-gen-frontend
+2. Install dependencies
 
-**2. Install dependencies**
-\`\`\`bash
+Bash
 npm install
-\`\`\`
+3. Set up Environment Variables
+Create a .env.local file in the root directory and add the following:
 
-**3. Set up Environment Variables**
-Create a \`.env.local\` file in the root directory and add the following:
-\`\`\`env
+Code snippet
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
 CLERK_SECRET_KEY=your_clerk_secret_key
 MONGODB_URI=your_mongodb_connection_string
-NEXT_PUBLIC_AI_API_URL=http://localhost:8000 # Pointing to Python AI Engine
-\`\`\`
+NEXT_PUBLIC_AI_API_URL=http://localhost:8000
+4. Run the Development Server
 
-**4. Run the Development Server**
-\`\`\`bash
+Bash
 npm run dev
-\`\`\`
-Visit \`http://localhost:3000\` to see the application in action.
+Visit http://localhost:3000 to see the application in action.
 
----
-*Built with 🩵 by [Vedant Bhamare] - IT Undergrad & Full Stack Developer*
+Architected with 🩵 by Vedant Bhamare - IT Undergrad & Full Stack Developer
