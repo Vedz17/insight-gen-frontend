@@ -26,12 +26,13 @@ InsightGen is a production-grade multi-tenant SaaS application engineered to aut
 
 **1. Clone the repository**
 ```bash
-git clone [https://github.com/Vedz17/insight-gen-frontend.git](https://github.com/Vedz17/insight-gen-frontend.git)
+git clone [https://github.com/Vedz17/insight-gen-frontend.git] (https://github.com/Vedz17/insight-gen-frontend.git)
 cd insight-gen-frontend
-2. Install dependencies
 
+2. Install dependencies
 Bash
 npm install
+
 3. Set up Environment Variables
 Create a .env.local file in the root directory and add the following:
 
