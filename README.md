@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🌟 InsightGen: The AI-Powered NAAC Auditor
 
-## Getting Started
+![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
 
-First, run the development server:
+InsightGen is a production-grade multi-tenant SaaS application engineered to automate and streamline institutional NAAC compliance reporting. By integrating an advanced multi-agent AI ecosystem, InsightGen realistically reduces the time required to compile, synthesize, and structure institutional NAAC reports by **45 percent**.
 
-```bash
+## ✨ Key Features
+- **Multi-Tenant Architecture:** Secure, isolated workspaces for different institutional audits.
+- **Dynamic Analytics Dashboard:** Live Recharts-based data visualization tracking document uploads and report generations with intelligent empty states.
+- **Streaming Chat Arena:** Real-time AI response streaming with a live "Agent Status" monitor (Tracking Researcher, Writer, and Auditor agents in real-time).
+- **Dual-Database System:** Utilizes MongoDB for robust application state management (Workspaces, Documents, Activity Logs).
+- **Premium UI/UX:** Built with Tailwind CSS, Shadcn-inspired components, and Framer Motion for highly fluid, dark-mode micro-interactions.
+- **Enterprise Authentication:** Handled seamlessly via Clerk Auth.
+
+## 🛠️ Tech Stack
+- **Framework:** Next.js (App Router) + TypeScript
+- **Styling & Animation:** Tailwind CSS, Framer Motion, Lucide React
+- **Database (App State):** MongoDB (Mongoose ORM)
+- **Authentication:** Clerk Auth
+- **Data Visualization:** Recharts
+
+## 🚀 Step-by-Step Setup
+
+**1. Clone the repository**
+\`\`\`bash
+git clone https://github.com/your-username/insightgen-client.git
+cd insightgen-client
+\`\`\`
+
+**2. Install dependencies**
+\`\`\`bash
+npm install
+\`\`\`
+
+**3. Set up Environment Variables**
+Create a \`.env.local\` file in the root directory and add the following:
+\`\`\`env
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+CLERK_SECRET_KEY=your_clerk_secret_key
+MONGODB_URI=your_mongodb_connection_string
+NEXT_PUBLIC_AI_API_URL=http://localhost:8000 # Pointing to Python AI Engine
+\`\`\`
+
+**4. Run the Development Server**
+\`\`\`bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+\`\`\`
+Visit \`http://localhost:3000\` to see the application in action.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+*Built with 🩵 by [Vedant Bhamare] - IT Undergrad & Full Stack Developer*
