@@ -41,37 +41,120 @@ export default function ReportsPage() {
   }, [activeWorkspaceId]);
 
   const handleGenerate = async () => {
-    if (!activeWorkspaceId) {
-      Swal.fire("Workspace Required", "Please select a workspace from the dropdown.", "warning");
-      return;
-    }
+  if (!activeWorkspaceId) {
+    Swal.fire(
+      "Workspace Required",
+      "Please select a workspace from the dropdown.",
+      "warning"
+    );
+    return;
+  }
 
-    setIsGenerating(true);
-    try {
-      const res = await fetch("/api/reports", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          workspaceId: activeWorkspaceId,
-          criterionId: selectedCriterion.id,
-          title: selectedCriterion.title,
-          topics: selectedCriterion.sections.join(":")
-        })
-      });
+  setIsGenerating(true);
 
-      const data = await res.json();
+  try {
+    const generatedSections: string[] = [];
 
-      if (data.success && data.reportId) {
-        router.push(`/workspace/${activeWorkspaceId}/report/${data.reportId}`);
-      } else {
-        throw new Error(data.error || "Generation failed at engine level");
+    for (const section of selectedCriterion.sections) {
+      const cleanSectionName = section.replace(
+        /^\d+\.\d+\s*/,
+        ""
+      );
+
+      console.log(
+        `Generating section: ${cleanSectionName}`
+      );
+
+      const sectionRes = await fetch(
+        "/api/reports/section",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            workspaceId: activeWorkspaceId,
+            criterionId: selectedCriterion.id,
+            sectionName: cleanSectionName
+          })
+        }
+      );
+
+      const sectionData = await sectionRes.json();
+
+      if (!sectionRes.ok || !sectionData.success) {
+        throw new Error(
+          sectionData.error ||
+          `Failed to generate ${cleanSectionName}`
+        );
       }
-    } catch (error: any) {
-      Swal.fire("Error", error.message, "error");
-    } finally {
-      setIsGenerating(false);
+
+      if (
+        typeof sectionData.content !== "string" ||
+        !sectionData.content.trim()
+      ) {
+        throw new Error(
+          `Empty content returned for ${cleanSectionName}`
+        );
+      }
+
+      generatedSections.push(
+        sectionData.content.trim()
+      );
+      await new Promise((resolve) =>
+  setTimeout(resolve, 2000)
+);
     }
-  };
+
+    const generatedContent = generatedSections.join(
+      "\n\n---\n\n"
+    );
+
+    const saveRes = await fetch("/api/reports", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        workspaceId: activeWorkspaceId,
+        criterionId: selectedCriterion.id,
+        title: selectedCriterion.title,
+        content: generatedContent
+      })
+    });
+
+    const saveData = await saveRes.json();
+
+    if (
+      !saveRes.ok ||
+      !saveData.success ||
+      !saveData.reportId
+    ) {
+      throw new Error(
+        saveData.error || "Failed to save generated report"
+      );
+    }
+
+    router.push(
+      `/workspace/${activeWorkspaceId}/report/${saveData.reportId}`
+    );
+
+  } catch (error: any) {
+    console.error(
+      "Report Generation Error:",
+      error
+    );
+
+    Swal.fire(
+      "Error",
+      error.message,
+      "error"
+    );
+
+  } finally {
+    setIsGenerating(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-[#0B0F19] text-white p-8">
