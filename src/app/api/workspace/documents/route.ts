@@ -1,8 +1,8 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db/connect";
-import { Document, ActivityLog, Workspace } from "@/lib/db/models"; // 🚀 FIX: Added Workspace
-import { auth } from '@clerk/nextjs/server'; // 🚀 FIX: Added Clerk Auth
+import { Document, ActivityLog, Workspace } from "@/lib/db/models"; //  FIX: Added Workspace
+import { auth } from '@clerk/nextjs/server'; //  FIX: Added Clerk Auth
 
 
 // 1. GET: Fetch all documents for a workspace
