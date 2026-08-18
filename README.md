@@ -2,7 +2,7 @@
 
 ### 🚀 Live Demo & API Access
 * **Live Frontend (Vercel):** [https://insightgen-ai.vercel.app/](https://insightgen-ai.vercel.app/)
-* **Backend API Docs (Render):** [https://multi-agent-insight-genarator.onrender.com/docs](https://multi-agent-insight-genarator.onrender.com/docs)
+* **Backend API Docs (Render):** [https://multi-agent-insight-genarator.onrender.com/docs](https://multi-agent-insight-genarator.onrender.com)
 
 ---
 
