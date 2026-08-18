@@ -102,7 +102,7 @@ export default function ReportsPage() {
         sectionData.content.trim()
       );
       await new Promise((resolve) =>
-  setTimeout(resolve, 2000)
+  setTimeout(resolve, 4500)
 );
     }
 
