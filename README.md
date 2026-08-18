@@ -31,3 +31,27 @@ InsightGen is a production-grade multi-tenant SaaS application engineered to aut
 ```bash
 git clone [https://github.com/Vedz17/insight-gen-frontend.git](https://github.com/Vedz17/insight-gen-frontend.git)
 cd insight-gen-frontend
+```
+
+**2. Install dependencies**
+```bash
+npm install
+```
+
+**3. Set up Environment Variables**
+Create a `.env.local` file in the root directory and add the following:
+```env
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+CLERK_SECRET_KEY=your_clerk_secret_key
+MONGODB_URI=your_mongodb_connection_string
+NEXT_PUBLIC_AI_API_URL=[https://multi-agent-insight-genarator.onrender.com](https://multi-agent-insight-genarator.onrender.com)
+```
+
+**4. Run the Development Server**
+```bash
+npm run dev
+```
+Visit `http://localhost:3000` to see the application in action.
+
+---
+*Architected with 🩵 by Vedant Bhamare - IT Undergrad & Full Stack Developer*
