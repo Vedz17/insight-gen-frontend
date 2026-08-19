@@ -38,8 +38,8 @@ export async function POST(req: Request) {
           workspace_id: workspaceId,
           criterion_id: criterionId,
           section_name: sectionName
-        }),
-        signal: AbortSignal.timeout(30000)
+        })
+        
       }
     );
 
